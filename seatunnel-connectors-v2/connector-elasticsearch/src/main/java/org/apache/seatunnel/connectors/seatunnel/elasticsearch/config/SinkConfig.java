@@ -44,7 +44,19 @@ public class SinkConfig {
                     .noDefaultValue()
                     .withDescription(
                             "Elasticsearch index type, it is recommended not to specify in elasticsearch 6 and above");
+    public static final Option<String> kindAct =
+            Options.key("kindAct")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "当前行行为");
 
+    public static final Option<String> synTimeAct =
+            Options.key("synTimeAct")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "同步时间列名");
     public static final Option<List<String>> PRIMARY_KEYS =
             Options.key("primary_keys")
                     .listType(String.class)

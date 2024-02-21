@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.elasticsearch.serialize;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.shade.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.seatunnel.shade.com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -34,6 +35,8 @@ import org.apache.seatunnel.connectors.seatunnel.elasticsearch.serialize.type.In
 
 import lombok.NonNull;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.Temporal;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,10 +52,12 @@ public class ElasticsearchRowSerializer implements SeaTunnelRowSerializer {
     private final IndexTypeSerializer indexTypeSerializer;
     private final Function<SeaTunnelRow, String> keyExtractor;
 
+    private final IndexInfo indexInfo;
     public ElasticsearchRowSerializer(
             ElasticsearchClusterInfo elasticsearchClusterInfo,
             IndexInfo indexInfo,
             SeaTunnelRowType seaTunnelRowType) {
+        this.indexInfo = indexInfo;
         this.indexTypeSerializer =
                 IndexTypeSerializerFactory.getIndexTypeSerializer(
                         elasticsearchClusterInfo, indexInfo.getType());
@@ -72,6 +77,10 @@ public class ElasticsearchRowSerializer implements SeaTunnelRowSerializer {
                 return serializeUpsert(row);
             case UPDATE_BEFORE:
             case DELETE:
+                String serializeDelete = serializeDelete(row);
+                if (serializeDelete == null) {
+                    return serializeUpsert(row);
+                }
                 return serializeDelete(row);
             default:
                 throw new ElasticsearchConnectorException(
@@ -141,6 +150,10 @@ public class ElasticsearchRowSerializer implements SeaTunnelRowSerializer {
 
     private String serializeDelete(SeaTunnelRow row) {
         String key = keyExtractor.apply(row);
+        if (key == null) {
+            //特殊处理
+            return null;
+        }
         Map<String, String> deleteMetadata = createMetadata(row, key);
         String deleteMetadataStr;
         try {
@@ -173,6 +186,12 @@ public class ElasticsearchRowSerializer implements SeaTunnelRowSerializer {
             } else {
                 doc.put(fieldNames[i], value);
             }
+        }
+        if (StringUtils.isNotBlank(indexInfo.getKindAct())) {
+            doc.put(indexInfo.getKindAct(), row.getRowKind().name());
+        }
+        if (StringUtils.isNotBlank(indexInfo.getSynTimeAct())) {
+            doc.put(indexInfo.getSynTimeAct(), LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
         }
         return doc;
     }
