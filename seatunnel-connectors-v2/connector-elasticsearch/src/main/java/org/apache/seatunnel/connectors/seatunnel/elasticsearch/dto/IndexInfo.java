@@ -33,6 +33,7 @@ public class IndexInfo {
 
     private String kindAct;
     private String synTimeAct;
+
     public IndexInfo(ReadonlyConfig config) {
         index = config.get(SinkConfig.INDEX);
         type = config.get(SinkConfig.INDEX_TYPE);

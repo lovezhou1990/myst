@@ -17,7 +17,6 @@
 
 package org.apache.seatunnel.connectors.seatunnel.elasticsearch.serialize;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.shade.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.seatunnel.shade.com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -32,6 +31,8 @@ import org.apache.seatunnel.connectors.seatunnel.elasticsearch.serialize.index.I
 import org.apache.seatunnel.connectors.seatunnel.elasticsearch.serialize.index.IndexSerializerFactory;
 import org.apache.seatunnel.connectors.seatunnel.elasticsearch.serialize.type.IndexTypeSerializer;
 import org.apache.seatunnel.connectors.seatunnel.elasticsearch.serialize.type.IndexTypeSerializerFactory;
+
+import org.apache.commons.lang3.StringUtils;
 
 import lombok.NonNull;
 
@@ -53,6 +54,7 @@ public class ElasticsearchRowSerializer implements SeaTunnelRowSerializer {
     private final Function<SeaTunnelRow, String> keyExtractor;
 
     private final IndexInfo indexInfo;
+
     public ElasticsearchRowSerializer(
             ElasticsearchClusterInfo elasticsearchClusterInfo,
             IndexInfo indexInfo,
@@ -151,7 +153,7 @@ public class ElasticsearchRowSerializer implements SeaTunnelRowSerializer {
     private String serializeDelete(SeaTunnelRow row) {
         String key = keyExtractor.apply(row);
         if (key == null) {
-            //特殊处理
+            // 特殊处理
             return null;
         }
         Map<String, String> deleteMetadata = createMetadata(row, key);
@@ -191,7 +193,10 @@ public class ElasticsearchRowSerializer implements SeaTunnelRowSerializer {
             doc.put(indexInfo.getKindAct(), row.getRowKind().name());
         }
         if (StringUtils.isNotBlank(indexInfo.getSynTimeAct())) {
-            doc.put(indexInfo.getSynTimeAct(), LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
+            doc.put(
+                    indexInfo.getSynTimeAct(),
+                    LocalDateTime.now()
+                            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
         }
         return doc;
     }
