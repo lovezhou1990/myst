@@ -38,6 +38,7 @@ import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
 import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Timestamp;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -48,9 +49,11 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 
 /** Deserialization schema from Debezium object to {@link SeaTunnelRow} */
+@Slf4j
 public class SeaTunnelRowDebeziumDeserializationConverters implements Serializable {
     private static final long serialVersionUID = -897499476343410567L;
     protected final DebeziumDeserializationConverter[] physicalConverters;
@@ -91,6 +94,90 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
                         SeaTunnelRowDebeziumDeserializationConverters.convertField(
                                 physicalConverters[i], fieldValue, fieldSchema);
                 row.setField(i, convertedField);
+            }
+        }
+        // metadata column
+        for (int i = 0; i < metadataConverters.length; i++) {
+            row.setField(i + physicalConverters.length, metadataConverters[i].read(record));
+        }
+        return row;
+    }
+
+    public SeaTunnelRow convertChangeLog(SourceRecord record, Struct struct, Schema schema)
+            throws Exception {
+        int arity = physicalConverters.length + metadataConverters.length;
+        SeaTunnelRow row = new SeaTunnelRow(arity);
+        // physical column
+        for (int i = 0; i < physicalConverters.length; i++) {
+            String fieldName = fieldNames[i];
+            Field field = schema.field(fieldName);
+            if (field == null) {
+                row.setField(i, null);
+            } else {
+                Object fieldValue = struct.get(fieldName);
+                Schema fieldSchema = field.schema();
+                Object convertedField =
+                        SeaTunnelRowDebeziumDeserializationConverters.convertField(
+                                physicalConverters[i], fieldValue, fieldSchema);
+                if (Objects.equals(fieldName, "id")) {
+                    row.setField(i, convertedField);
+                } else {
+                    row.setField(i, Objects.toString(convertedField));
+                }
+            }
+        }
+        // metadata column
+        for (int i = 0; i < metadataConverters.length; i++) {
+            row.setField(i + physicalConverters.length, metadataConverters[i].read(record));
+        }
+        return row;
+    }
+
+    public SeaTunnelRow convert(
+            SourceRecord record,
+            Struct beforestruct,
+            Schema beforeschema,
+            Struct afterstruct,
+            Schema afterschema)
+            throws Exception {
+        int arity = physicalConverters.length + metadataConverters.length;
+        SeaTunnelRow row = new SeaTunnelRow(arity);
+        // physical column
+        for (int i = 0; i < physicalConverters.length; i++) {
+            String fieldName = fieldNames[i];
+            Field beforefield = beforeschema.field(fieldName);
+            Field afterfield = afterschema.field(fieldName);
+            if (beforefield == null && afterfield == null) {
+                row.setField(i, null);
+            } else if (beforefield == null && afterfield != null) {
+                Object afterValue = afterstruct.get(fieldName);
+                row.setField(i, " ->" + afterValue);
+            } else if (beforefield != null && afterfield == null) {
+                Object beforeValue = beforestruct.get(fieldName);
+                row.setField(i, beforeValue + "-> ");
+            } else {
+                Object beforefieldValue = beforestruct.get(fieldName);
+                Schema beforefieldSchema = beforefield.schema();
+                Object beforeconvertedField =
+                        SeaTunnelRowDebeziumDeserializationConverters.convertField(
+                                physicalConverters[i], beforefieldValue, beforefieldSchema);
+
+                Object afterfieldValue = afterstruct.get(fieldName);
+                Schema afterfieldSchema = afterfield.schema();
+                Object afterconvertedField =
+                        SeaTunnelRowDebeziumDeserializationConverters.convertField(
+                                physicalConverters[i], afterfieldValue, afterfieldSchema);
+                if (Objects.equals(fieldName, "id")) {
+                    row.setField(i, beforeconvertedField);
+                } else if (Objects.equals(beforeconvertedField, afterconvertedField)) {
+                    //                    row.setField(i, "");
+                } else {
+                    row.setField(
+                            i,
+                            (beforeconvertedField == null ? "" : beforeconvertedField)
+                                    + "->"
+                                    + (afterconvertedField == null ? "" : afterconvertedField));
+                }
             }
         }
         // metadata column

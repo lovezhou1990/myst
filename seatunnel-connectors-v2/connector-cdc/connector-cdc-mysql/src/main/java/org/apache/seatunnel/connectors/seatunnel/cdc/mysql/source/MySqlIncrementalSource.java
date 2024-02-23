@@ -36,6 +36,7 @@ import org.apache.seatunnel.connectors.cdc.base.source.IncrementalSource;
 import org.apache.seatunnel.connectors.cdc.base.source.offset.OffsetFactory;
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.seatunnel.connectors.cdc.debezium.DeserializeFormat;
+import org.apache.seatunnel.connectors.cdc.debezium.row.ChangeLogDebeziumDeserializeSchema;
 import org.apache.seatunnel.connectors.cdc.debezium.row.DebeziumJsonDeserializeSchema;
 import org.apache.seatunnel.connectors.cdc.debezium.row.SeaTunnelRowDebeziumDeserializeSchema;
 import org.apache.seatunnel.connectors.seatunnel.cdc.mysql.config.MySqlSourceConfigFactory;
@@ -100,6 +101,17 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
             return (DebeziumDeserializationSchema<T>)
                     new DebeziumJsonDeserializeSchema(
                             config.get(JdbcSourceOptions.DEBEZIUM_PROPERTIES));
+        }
+
+        if (DeserializeFormat.CHANGE_LOG.equals(config.get(JdbcSourceOptions.FORMAT))) {
+            SeaTunnelDataType<SeaTunnelRow> physicalRowType = dataType;
+            String zoneId = config.get(JdbcSourceOptions.SERVER_TIME_ZONE);
+            return (DebeziumDeserializationSchema<T>)
+                    ChangeLogDebeziumDeserializeSchema.builder()
+                            .setPhysicalRowType(physicalRowType)
+                            .setResultTypeInfo(physicalRowType)
+                            .setServerTimeZone(ZoneId.of(zoneId))
+                            .build();
         }
 
         SeaTunnelDataType<SeaTunnelRow> physicalRowType = dataType;
