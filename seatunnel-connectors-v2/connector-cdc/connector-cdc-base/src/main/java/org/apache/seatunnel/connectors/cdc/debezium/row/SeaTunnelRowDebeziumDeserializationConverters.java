@@ -17,9 +17,14 @@
 
 package org.apache.seatunnel.connectors.cdc.debezium.row;
 
+import io.debezium.data.Json;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.commons.lang3.time.DateUtils;
 import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.common.utils.DateTimeUtils;
+import org.apache.seatunnel.common.utils.JsonUtils;
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConverter;
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConverterFactory;
 import org.apache.seatunnel.connectors.cdc.debezium.MetadataConverter;
@@ -49,6 +54,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -122,7 +128,7 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
                 if (Objects.equals(fieldName, "id")) {
                     row.setField(i, convertedField);
                 } else {
-                    row.setField(i, Objects.toString(convertedField));
+                    row.setField(i, formatStr(convertedField));
                 }
             }
         }
@@ -132,6 +138,19 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
         }
         return row;
     }
+
+    private String formatStr(Object o) {
+        if (o instanceof Date) {
+            return DateFormatUtils.format((Date) o, DateFormatUtils.ISO_8601_EXTENDED_DATETIME_FORMAT.getPattern());
+        }else if (o instanceof LocalDateTime) {
+            return DateTimeUtils.toString((LocalDateTime) o, DateTimeUtils.Formatter.YYYY_MM_DD_HH_MM_SS_ISO8601);
+        }else if (o instanceof LocalDate) {
+            LocalDate ld= (LocalDate) o;
+            return DateTimeUtils.toString(ld.atStartOfDay(), DateTimeUtils.Formatter.YYYY_MM_DD_HH_MM_SS_ISO8601);
+        }
+        return Objects.toString(o);
+    }
+
 
     public SeaTunnelRow convert(
             SourceRecord record,
