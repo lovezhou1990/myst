@@ -141,12 +141,12 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
 
     private String formatStr(Object o) {
         if (o instanceof Date) {
-            return DateFormatUtils.format((Date) o, DateFormatUtils.ISO_8601_EXTENDED_DATETIME_FORMAT.getPattern());
+            return DateFormatUtils.format((Date) o, "yyyy-MM-dd HH:mm:ss");
         }else if (o instanceof LocalDateTime) {
-            return DateTimeUtils.toString((LocalDateTime) o, DateTimeUtils.Formatter.YYYY_MM_DD_HH_MM_SS_ISO8601);
+            return DateTimeUtils.toString((LocalDateTime) o, DateTimeUtils.Formatter.YYYY_MM_DD_HH_MM_SS);
         }else if (o instanceof LocalDate) {
             LocalDate ld= (LocalDate) o;
-            return DateTimeUtils.toString(ld.atStartOfDay(), DateTimeUtils.Formatter.YYYY_MM_DD_HH_MM_SS_ISO8601);
+            return DateTimeUtils.toString(ld.atStartOfDay(), DateTimeUtils.Formatter.YYYY_MM_DD_HH_MM_SS);
         }
         return Objects.toString(o);
     }
