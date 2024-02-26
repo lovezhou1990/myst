@@ -103,7 +103,7 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
                             config.get(JdbcSourceOptions.DEBEZIUM_PROPERTIES));
         }
 
-        if (DeserializeFormat.CHANGE_LOG.equals(config.get(JdbcSourceOptions.FORMAT))) {
+        if (DeserializeFormat.CHANGELOG.equals(config.get(JdbcSourceOptions.FORMAT))) {
             SeaTunnelDataType<SeaTunnelRow> physicalRowType = dataType;
             String zoneId = config.get(JdbcSourceOptions.SERVER_TIME_ZONE);
             return (DebeziumDeserializationSchema<T>)
