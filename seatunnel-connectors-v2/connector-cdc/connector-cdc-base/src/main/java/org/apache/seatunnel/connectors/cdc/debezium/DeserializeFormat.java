@@ -22,7 +22,7 @@ import org.apache.seatunnel.format.compatible.debezium.json.CompatibleDebeziumJs
 public enum DeserializeFormat {
     DEFAULT("default"),
     COMPATIBLE_DEBEZIUM_JSON(CompatibleDebeziumJsonDeserializationSchema.IDENTIFIER),
-    CHANGE_LOG("change_log");
+    CHANGE_LOG("changelog");
 
     private String name;
 
