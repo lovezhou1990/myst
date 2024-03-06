@@ -59,6 +59,7 @@ public class SubmitJobOperation extends AbstractJobAsyncOperation {
     @Override
     protected PassiveCompletableFuture<?> doRun() throws Exception {
         SeaTunnelServer seaTunnelServer = getService();
+        // 这里是seatunnel-client 提交任务达到的地方， 最终会往coordinator 中提交
         return seaTunnelServer.getCoordinatorService().submitJob(jobId, jobImmutableInformation);
     }
 }
