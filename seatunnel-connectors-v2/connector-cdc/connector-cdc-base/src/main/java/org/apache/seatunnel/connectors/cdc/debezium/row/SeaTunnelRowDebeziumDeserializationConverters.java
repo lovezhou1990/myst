@@ -170,10 +170,10 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
                 row.setField(i, null);
             } else if (beforefield == null && afterfield != null) {
                 Object afterValue = afterstruct.get(fieldName);
-                row.setField(i, " ->" + afterValue);
+                row.setField(i, " ->" + formatStr(afterValue));
             } else if (beforefield != null && afterfield == null) {
                 Object beforeValue = beforestruct.get(fieldName);
-                row.setField(i, beforeValue + "-> ");
+                row.setField(i, formatStr(beforeValue) + "-> ");
             } else {
                 Object beforefieldValue = beforestruct.get(fieldName);
                 Schema beforefieldSchema = beforefield.schema();
@@ -191,11 +191,9 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
                 } else if (Objects.equals(beforeconvertedField, afterconvertedField)) {
                     //                    row.setField(i, "");
                 } else {
-                    row.setField(
-                            i,
-                            (beforeconvertedField == null ? "" : beforeconvertedField)
+                    row.setField(i,formatStr(beforeconvertedField)
                                     + "->"
-                                    + (afterconvertedField == null ? "" : afterconvertedField));
+                                    + formatStr(afterconvertedField));
                 }
             }
         }
