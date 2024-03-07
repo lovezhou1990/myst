@@ -49,6 +49,7 @@ public class ClientJobProxy implements Job {
             @NonNull JobImmutableInformation jobImmutableInformation) {
         this.seaTunnelHazelcastClient = seaTunnelHazelcastClient;
         this.jobId = jobImmutableInformation.getJobId();
+        // 客户端使用 hazelcast提交任务
         submitJob(jobImmutableInformation);
     }
 
@@ -74,6 +75,7 @@ public class ClientJobProxy implements Job {
                         seaTunnelHazelcastClient
                                 .getSerializationService()
                                 .toData(jobImmutableInformation));
+        // 组装请求信息发送到 server端
         PassiveCompletableFuture<Void> submitJobFuture =
                 seaTunnelHazelcastClient.requestOnMasterAndGetCompletableFuture(request);
         submitJobFuture.join();
