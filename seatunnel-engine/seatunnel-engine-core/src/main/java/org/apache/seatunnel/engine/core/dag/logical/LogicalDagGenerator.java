@@ -63,7 +63,9 @@ public class LogicalDagGenerator {
         actions.forEach(this::createLogicalVertex);
         Set<LogicalEdge> logicalEdges = createLogicalEdges();
         LogicalDag logicalDag = new LogicalDag(jobConfig, idGenerator);
+        //edges 中为input>output键值对， 从source->transform 从 transform -> sink
         logicalDag.getEdges().addAll(logicalEdges);
+        // vertexMap 中为所有的参与任务的节点从source transform sink
         logicalDag.getLogicalVertexMap().putAll(logicalVertexMap);
         return logicalDag;
     }

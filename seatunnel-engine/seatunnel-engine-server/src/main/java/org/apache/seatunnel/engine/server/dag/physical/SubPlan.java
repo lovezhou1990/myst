@@ -607,6 +607,7 @@ public class SubPlan {
                         task -> {
                             if (task.getExecutionState().equals(ExecutionState.CREATED)) {
                                 task.startPhysicalVertex();
+                                //zhoulj 任务启动执行 2.3
                                 task.makeTaskGroupDeploy();
                             }
                         });

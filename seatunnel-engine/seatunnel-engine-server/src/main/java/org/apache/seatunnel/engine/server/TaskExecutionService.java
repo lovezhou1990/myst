@@ -229,6 +229,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
             TaskGroupExecutionTracker taskGroupExecutionTracker, List<Task> tasks) {
 
         CountDownLatch startedLatch = new CountDownLatch(tasks.size());
+        //zhoulj 任务启动执行 2.8 任务提交到 executorService 中执行了，  后续操作就在  NamedTaskWrapper 的run 方法中了
         taskGroupExecutionTracker.blockingFutures =
                 tasks.stream()
                         .map(
@@ -376,7 +377,10 @@ public class TaskExecutionService implements DynamicMetricsProvider {
                     taskGroup.getTaskGroupLocation(),
                     new TaskGroupContext(taskGroup, classLoader, jars));
             cancellationFutures.put(taskGroup.getTaskGroupLocation(), cancellationFuture);
+            //重点：zhoulj 执行效率高的任务放到共享线程池中执行，
             submitThreadShareTask(executionTracker, byCooperation.get(true));
+            // 执行效率低下的任务放到单独的线程中执行
+            ////zhoulj 任务启动执行 2.7 发布任务
             submitBlockingTask(executionTracker, byCooperation.get(false));
             taskGroup.setTasksContext(taskExecutionContextMap);
             logger.info(
@@ -645,6 +649,8 @@ public class TaskExecutionService implements DynamicMetricsProvider {
                 startedLatch.countDown();
                 t.init();
                 do {
+                    //zhoulj 任务启动执行 2.9 调用具体的数据组件的 task.call 方法
+                    //zhoulj 任务启动执行 2.10  这里还会执行T SourceSplitEnumeratorTask、SourceSeaTunnelTask、TransformSeaTunnelTask
                     result = t.call();
                 } while (!result.isDone()
                         && isRunning

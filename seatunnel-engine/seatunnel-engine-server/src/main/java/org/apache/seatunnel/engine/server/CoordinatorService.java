@@ -409,6 +409,7 @@ public class CoordinatorService {
                         metricsImap,
                         engineConfig,
                         seaTunnelServer);
+        //zhoulj 重点：通过任务配置文件生成执行计划 提交到线程池中开始初始化与执行任务
         executorService.submit(
                 () -> {
                     try {
@@ -429,6 +430,7 @@ public class CoordinatorService {
                     }
                     if (!jobSubmitFuture.isCompletedExceptionally()) {
                         try {
+                            // 真正任务开始运行的地方
                             jobMaster.run();
                         } finally {
                             // voidCompletableFuture will be cancelled when zeta master node

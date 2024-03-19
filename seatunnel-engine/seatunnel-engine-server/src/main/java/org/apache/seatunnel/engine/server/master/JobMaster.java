@@ -205,6 +205,7 @@ public class JobMaster {
                         .getClassLoader(
                                 jobImmutableInformation.getJobId(),
                                 jobImmutableInformation.getPluginJarsUrls());
+        // 生成逻辑执行计划
         logicalDag =
                 CustomClassLoadedObject.deserializeWithCustomClassLoader(
                         nodeEngine.getSerializationService(),
@@ -312,6 +313,8 @@ public class JobMaster {
 
     public void run() {
         try {
+
+            //zhoulj 任务启动执行 2.1
             physicalPlan.startJob();
         } catch (Throwable e) {
             LOGGER.severe(

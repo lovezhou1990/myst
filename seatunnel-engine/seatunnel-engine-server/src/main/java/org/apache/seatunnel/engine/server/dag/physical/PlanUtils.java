@@ -46,6 +46,7 @@ public class PlanUtils {
             @NonNull IMap runningJobStateTimestampsIMap,
             @NonNull QueueType queueType,
             @NonNull EngineConfig engineConfig) {
+        //zhoulj 从配置文件的配置生成逻辑计划， 在生成Edges相关的边缘信息？ 》最终生成物理执行计划
         return new PhysicalPlanGenerator(
                         new ExecutionPlanGenerator(
                                         logicalDag, jobImmutableInformation, engineConfig)

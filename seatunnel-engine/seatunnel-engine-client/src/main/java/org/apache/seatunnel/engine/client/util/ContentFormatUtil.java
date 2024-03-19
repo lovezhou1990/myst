@@ -26,6 +26,18 @@ import java.util.List;
 
 public class ContentFormatUtil {
 
+    public static int getStringLength(String str) {
+        int length = 0;
+        for (char c : str.toCharArray()) {
+            // 判断是否为汉字，Unicode编码中汉字范围是'\u4e00'到'\u9fa5'
+            if ('\u4e00' <= c && c <= '\u9fa5') {
+                length += 2;
+            } else {
+                length += 1;
+            }
+        }
+        return length;
+    }
     public static String format(List<JobStatusData> jobStatusDataList) {
         int maxJobIdLength = 6;
         int maxJobNameLength = 8;
@@ -37,7 +49,7 @@ public class ContentFormatUtil {
             maxJobIdLength =
                     Math.max(maxJobIdLength, String.valueOf(jobStatusData.getJobId()).length());
             maxJobNameLength =
-                    Math.max(maxJobNameLength, String.valueOf(jobStatusData.getJobName()).length());
+                    Math.max(maxJobNameLength, getStringLength(String.valueOf(jobStatusData.getJobName())));
             maxJobStatusLength =
                     Math.max(
                             maxJobStatusLength,

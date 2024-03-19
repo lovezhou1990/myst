@@ -76,10 +76,10 @@ public class ExecutionPlanGenerator {
 
     public ExecutionPlan generate() {
         log.debug("Generate execution plan using logical plan:");
-
+        //根据hazalcast 传过来的数据重新生成 execution edge（重新生成id,action)
         Set<ExecutionEdge> executionEdges = generateExecutionEdges(logicalPlan.getEdges());
         log.debug("Phase 1: generate execution edge list {}", executionEdges);
-
+        //TODO zhoulj:这里的shuffleEdges 是干嘛用的？？？
         executionEdges = generateShuffleEdges(executionEdges);
         log.debug("Phase 2: generate shuffle edge list {}", executionEdges);
 

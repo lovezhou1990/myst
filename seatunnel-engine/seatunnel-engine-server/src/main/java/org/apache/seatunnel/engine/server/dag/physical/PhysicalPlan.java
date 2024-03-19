@@ -309,6 +309,7 @@ public class PhysicalPlan {
                                 subPlan -> {
                                     if (PipelineStatus.CREATED.equals(
                                             subPlan.getCurrPipelineStatus())) {
+                                        ////zhoulj 任务启动执行 2.2 为什么这里要从subPlan 中执行任务
                                         subPlan.startSubPlanStateProcess();
                                     }
                                 });

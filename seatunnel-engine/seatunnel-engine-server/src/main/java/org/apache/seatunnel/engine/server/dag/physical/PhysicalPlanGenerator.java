@@ -549,6 +549,7 @@ public class PhysicalPlanGenerator {
                                                                         jobImmutableInformation
                                                                                 .getJobId(),
                                                                         taskLocation,
+
                                                                         finalParallelismIndex,
                                                                         (PhysicalExecutionFlow<
                                                                                         SourceAction,

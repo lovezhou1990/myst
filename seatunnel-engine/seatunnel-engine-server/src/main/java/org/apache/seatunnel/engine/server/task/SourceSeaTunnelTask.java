@@ -118,6 +118,8 @@ public class SourceSeaTunnelTask<T, SplitT extends SourceSplit> extends SeaTunne
 
     @NonNull @Override
     public ProgressState call() throws Exception {
+
+        //zhoulj 任务启动执行 2.11 调用到source 获取数据源的数据， 也可能是 transform 组件进行数据处理的逻辑
         stateProcess();
         return progress.toState();
     }
