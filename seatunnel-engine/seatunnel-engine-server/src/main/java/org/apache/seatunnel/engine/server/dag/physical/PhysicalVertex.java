@@ -278,6 +278,7 @@ public class PhysicalVertex {
         return deployInternal(
                 taskGroupImmutableInformation -> {
                     SeaTunnelServer server = nodeEngine.getService(SeaTunnelServer.SERVICE_NAME);
+                    //zhoulj 任务启动执行 2.6 开始发布到执行器中执行任务
                     return server.getSlotService()
                             .getSlotContext(slotProfile)
                             .getTaskExecutionService()
@@ -336,6 +337,7 @@ public class PhysicalVertex {
             Function<TaskGroupImmutableInformation, TaskDeployState> taskGroupConsumer) {
         TaskGroupImmutableInformation taskGroupImmutableInformation =
                 getTaskGroupImmutableInformation();
+        //zhoulj 任务启动执行 2.5
         TaskDeployState state = taskGroupConsumer.apply(taskGroupImmutableInformation);
         updateTaskState(ExecutionState.RUNNING);
         return state;
@@ -554,7 +556,8 @@ public class PhysicalVertex {
             case RUNNING:
                 break;
             case DEPLOYING:
-                TaskDeployState deployState =
+                //zhoulj 任务启动执行 2.4
+                TaskDeployState deployState =//zhoulj 任务启动执行
                         deploy(jobMaster.getOwnedSlotProfiles(taskGroupLocation));
                 if (!deployState.isSuccess()) {
                     makeTaskGroupFailing(

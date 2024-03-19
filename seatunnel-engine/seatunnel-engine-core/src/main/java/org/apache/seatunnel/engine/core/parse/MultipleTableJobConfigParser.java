@@ -187,6 +187,7 @@ public class MultipleTableJobConfigParser {
                 Config sourceConfig = sourceConfigs.get(configIndex);
                 Tuple2<String, List<Tuple2<CatalogTable, Action>>> tuple2 =
                         parseSource(configIndex, sourceConfig, classLoader);
+                //生成 table-表信息、source方式的映射关系
                 tableWithActionMap.put(tuple2._1(), tuple2._2());
             }
 
@@ -310,7 +311,9 @@ public class MultipleTableJobConfigParser {
     public Tuple2<String, List<Tuple2<CatalogTable, Action>>> parseSource(
             int configIndex, Config sourceConfig, ClassLoader classLoader) {
         final ReadonlyConfig readonlyConfig = ReadonlyConfig.fromConfig(sourceConfig);
+        // factoryId 对应配置文件中的 source 插件名称 如MySQL-CDC
         final String factoryId = getFactoryId(readonlyConfig);
+        // tableId 对应配置文件中的 result_table_name
         final String tableId =
                 readonlyConfig.getOptional(CommonOptions.RESULT_TABLE_NAME).orElse(DEFAULT_ID);
 
@@ -322,13 +325,14 @@ public class MultipleTableJobConfigParser {
                         TableSourceFactory.class,
                         factoryId,
                         (factory) -> factory.createSource(null));
-
+        // 这个是什么意思？
         if (fallback) {
             Tuple2<CatalogTable, Action> tuple =
                     fallbackParser.parseSource(sourceConfig, jobConfig, tableId, parallelism);
             return new Tuple2<>(tableId, Collections.singletonList(tuple));
         }
-
+        // 重点：通过任务配置文件生成执行计划 client：提前通过数据源的配置连接数据获取表的元信息
+        // 包括了source配置信息，  数据表的元信息（表名， 字段名列表， 主键列表， 索引列表）
         Tuple2<SeaTunnelSource<Object, SourceSplit, Serializable>, List<CatalogTable>> tuple2 =
                 FactoryUtil.createAndPrepareSource(readonlyConfig, classLoader, factoryId);
 
@@ -347,6 +351,7 @@ public class MultipleTableJobConfigParser {
         for (CatalogTable catalogTable : tuple2._2()) {
             actions.add(new Tuple2<>(catalogTable, action));
         }
+        // >>> result_table_name -- List<actions>(表信息-action)
         return new Tuple2<>(tableId, actions);
     }
 
@@ -371,10 +376,12 @@ public class MultipleTableJobConfigParser {
             LinkedHashMap<String, List<Tuple2<CatalogTable, Action>>> tableWithActionMap) {
         Config config = transforms.poll();
         final ReadonlyConfig readonlyConfig = ReadonlyConfig.fromConfig(config);
+        //插件名称， 如Copy
         final String factoryId = getFactoryId(readonlyConfig);
         // get jar urls
         Set<URL> jarUrls = new HashSet<>();
         jarUrls.addAll(getTransformPluginJarPaths(config));
+        // 对应配置文件中的 source_table_name
         final List<String> inputIds = getInputIds(readonlyConfig);
 
         List<Tuple2<CatalogTable, Action>> inputs =
@@ -400,7 +407,7 @@ public class MultipleTableJobConfigParser {
                 return;
             }
         }
-
+        // 对应配置文件中的 result_table_name
         final String tableId =
                 readonlyConfig.getOptional(CommonOptions.RESULT_TABLE_NAME).orElse(DEFAULT_ID);
 
@@ -440,7 +447,7 @@ public class MultipleTableJobConfigParser {
         transform.setJobContext(jobConfig.getJobContext());
         long id = idGenerator.getNextId();
         String actionName = JobConfigParser.createTransformActionName(index, factoryId);
-
+        // 生成转换插件， 关注第三个参数， 上游inputActions 的source
         TransformAction transformAction =
                 new TransformAction(
                         id,
@@ -514,9 +521,11 @@ public class MultipleTableJobConfigParser {
             LinkedHashMap<String, List<Tuple2<CatalogTable, Action>>> tableWithActionMap) {
 
         ReadonlyConfig readonlyConfig = ReadonlyConfig.fromConfig(sinkConfig);
+        // 获取sink的插件名称， 如：Elasticsearch
         String factoryId = getFactoryId(readonlyConfig);
+        // 数据输入表名 source_table_name
         List<String> inputIds = getInputIds(readonlyConfig);
-
+        // 根据sink 配置的source_table_name 从上游数据流中拿到获取数据的方式
         List<List<Tuple2<CatalogTable, Action>>> inputVertices =
                 inputIds.stream()
                         .map(tableWithActionMap::get)
