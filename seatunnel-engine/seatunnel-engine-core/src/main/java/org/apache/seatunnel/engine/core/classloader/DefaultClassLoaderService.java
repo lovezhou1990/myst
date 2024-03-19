@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.engine.server.service.classloader;
+package org.apache.seatunnel.engine.core.classloader;
 
 import org.apache.seatunnel.engine.common.loader.SeaTunnelChildFirstClassLoader;
 
@@ -88,14 +88,25 @@ public class DefaultClassLoaderService implements ClassLoaderService {
             return;
         }
         if (referenceCount == 0) {
-            classLoaderMap.remove(key);
+            ClassLoader classLoader = classLoaderMap.remove(key);
             log.info("Release classloader for job {} with jars {}", jobId, jars);
             classLoaderReferenceCount.get(jobId).remove(key);
+            recycleClassLoaderFromThread(classLoader);
         }
         if (classLoaderMap.isEmpty()) {
             classLoaderCache.remove(jobId);
             classLoaderReferenceCount.remove(jobId);
         }
+    }
+
+    private static void recycleClassLoaderFromThread(ClassLoader classLoader) {
+        Thread.getAllStackTraces().keySet().stream()
+                .filter(thread -> thread.getContextClassLoader() == classLoader)
+                .forEach(
+                        thread -> {
+                            log.info("recycle classloader for thread " + thread.getName());
+                            thread.setContextClassLoader(null);
+                        });
     }
 
     private String covertJarsToKey(Collection<URL> jars) {

@@ -15,21 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.seatunnel.engine.server.service.classloader;
-
-import org.apache.curator.shaded.com.google.common.collect.Lists;
+package org.apache.seatunnel.engine.core.classloader;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import com.google.common.collect.Lists;
+
 import java.net.MalformedURLException;
 import java.net.URL;
 
-public class ClassLoaderServiceCacheModeTest extends AbstractClassLoaderServiceTest {
+public class ClassLoaderServiceTest extends AbstractClassLoaderServiceTest {
 
     @Override
     boolean cacheMode() {
-        return true;
+        return false;
     }
 
     @Test
@@ -48,7 +48,7 @@ public class ClassLoaderServiceCacheModeTest extends AbstractClassLoaderServiceT
         classLoaderService.releaseClassLoader(
                 3L,
                 Lists.newArrayList(new URL("file:///console.jar"), new URL("file:///fake.jar")));
-        Assertions.assertEquals(1, classLoaderService.queryClassLoaderCount());
+        Assertions.assertEquals(0, classLoaderService.queryClassLoaderCount());
     }
 
     @Test
@@ -59,7 +59,7 @@ public class ClassLoaderServiceCacheModeTest extends AbstractClassLoaderServiceT
         classLoaderService.getClassLoader(
                 3L,
                 Lists.newArrayList(new URL("file:///console.jar"), new URL("file:///fake.jar")));
-        Assertions.assertEquals(1, classLoaderService.queryClassLoaderCount());
+        Assertions.assertEquals(2, classLoaderService.queryClassLoaderCount());
         classLoaderService.releaseClassLoader(
                 3L,
                 Lists.newArrayList(new URL("file:///console.jar"), new URL("file:///fake.jar")));
@@ -67,6 +67,37 @@ public class ClassLoaderServiceCacheModeTest extends AbstractClassLoaderServiceT
         classLoaderService.releaseClassLoader(
                 2L,
                 Lists.newArrayList(new URL("file:///console.jar"), new URL("file:///fake.jar")));
-        Assertions.assertEquals(1, classLoaderService.queryClassLoaderCount());
+        Assertions.assertEquals(0, classLoaderService.queryClassLoaderCount());
+    }
+
+    @Test
+    void testRecycleClassLoaderFromThread() throws MalformedURLException, InterruptedException {
+        ClassLoader classLoader =
+                classLoaderService.getClassLoader(
+                        3L,
+                        Lists.newArrayList(
+                                new URL("file:///console.jar"), new URL("file:///fake.jar")));
+        ClassLoader appClassLoader = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(classLoader);
+        Thread thread =
+                new Thread(
+                        () -> {
+                            while (Thread.currentThread().getContextClassLoader() != null) {
+                                try {
+                                    Thread.sleep(1000);
+                                } catch (InterruptedException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                        });
+        thread.start();
+        Thread.currentThread().setContextClassLoader(appClassLoader);
+        Assertions.assertEquals(classLoader, thread.getContextClassLoader());
+        classLoaderService.releaseClassLoader(
+                3L,
+                Lists.newArrayList(new URL("file:///console.jar"), new URL("file:///fake.jar")));
+        Assertions.assertNull(thread.getContextClassLoader());
+        Thread.sleep(2000);
+        Assertions.assertFalse(thread.isAlive());
     }
 }
