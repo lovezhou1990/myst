@@ -109,7 +109,9 @@ import static org.apache.seatunnel.api.common.metrics.MetricTags.TASK_GROUP_ID;
 import static org.apache.seatunnel.api.common.metrics.MetricTags.TASK_GROUP_LOCATION;
 import static org.apache.seatunnel.api.common.metrics.MetricTags.TASK_ID;
 
-/** This class is responsible for the execution of the Task */
+/** This class is responsible for the execution of the Task
+ *  任务运行逻辑， 所有任务都会提交到这里来运行！！
+ * */
 public class TaskExecutionService implements DynamicMetricsProvider {
 
     private final String hzInstanceName;
@@ -117,10 +119,14 @@ public class TaskExecutionService implements DynamicMetricsProvider {
     private final ClassLoaderService classLoaderService;
     private final ILogger logger;
     private volatile boolean isRunning = true;
+
+    // zhoulj 线程共享任务队列？ 是干什么的？
     private final LinkedBlockingDeque<TaskTracker> threadShareTaskQueue =
             new LinkedBlockingDeque<>();
+    // 运行线程池， 所有的执行逻辑都放到这个线程池中执行的？
     private final ExecutorService executorService =
             newCachedThreadPool(new BlockingTaskThreadFactory());
+    // 运行总线 ？
     private final RunBusWorkSupplier runBusWorkSupplier =
             new RunBusWorkSupplier(executorService, threadShareTaskQueue);
     // key: TaskID
@@ -155,7 +161,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
                 registry.newMetricDescriptor()
                         .withTag(MetricTags.SERVICE, this.getClass().getSimpleName());
         registry.registerStaticMetrics(descriptor, this);
-
+        //重点：定时器  ，  根据配置多少秒打印一次本节点线程使用情况 ；
         scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
         scheduledExecutorService.scheduleAtFixedRate(
                 this::updateMetricsContextInImap,
@@ -168,6 +174,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
     }
 
     public void start() {
+        //zhoulj 任务开始运行 0-2
         runBusWorkSupplier.runNewBusWork(false);
     }
 
@@ -694,6 +701,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
     /**
      * CooperativeTaskWorker is used to poll the task call method, When a task times out, a new
      * BusWork will be created to take over the execution of the task
+     * 轮询方式调用该方法， 当任务超时就创建新的 buswork 来运行
      */
     public final class CooperativeTaskWorker implements Runnable {
 
@@ -751,6 +759,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
                             executionContexts
                                     .get(taskGroupExecutionTracker.taskGroup.getTaskGroupLocation())
                                     .getClassLoader());
+                    //zhoulj 重点：真正任务执行调用的地方
                     call = taskTracker.task.call();
                     synchronized (timer) {
                         timer.timerStop();
@@ -817,6 +826,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
                 BlockingQueue<Future<?>> futureBlockingQueue = new LinkedBlockingQueue<>();
                 CooperativeTaskWorker cooperativeTaskWorker =
                         new CooperativeTaskWorker(taskQueue, this, futureBlockingQueue);
+                //zhoulj 任务开始运行 0-3
                 Future<?> submit = executorService.submit(cooperativeTaskWorker);
                 futureBlockingQueue.add(submit);
                 return true;

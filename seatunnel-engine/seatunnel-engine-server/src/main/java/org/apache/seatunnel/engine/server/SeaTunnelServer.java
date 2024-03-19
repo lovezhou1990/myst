@@ -111,6 +111,7 @@ public class SeaTunnelServer
                 new TaskExecutionService(
                         classLoaderService, nodeEngine, nodeEngine.getProperties());
         nodeEngine.getMetricsRegistry().registerDynamicMetricsProvider(taskExecutionService);
+        //zhoulj 任务开始运行 0-1
         taskExecutionService.start();
         getSlotService();
         coordinatorService =
