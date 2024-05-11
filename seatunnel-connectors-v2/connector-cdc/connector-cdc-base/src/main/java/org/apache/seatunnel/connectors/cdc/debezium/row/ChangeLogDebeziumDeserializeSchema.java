@@ -326,7 +326,9 @@ public final class ChangeLogDebeziumDeserializeSchema
         private SeaTunnelDataType<SeaTunnelRow> physicalRowType;
         private SeaTunnelDataType<SeaTunnelRow> resultTypeInfo;
         private MetadataConverter[] metadataConverters = new MetadataConverter[0];
-        private ZoneId serverTimeZone = ZoneId.systemDefault();
+        private ZoneId
+
+                serverTimeZone = ZoneId.systemDefault();
         private DebeziumDeserializationConverterFactory userDefinedConverterFactory =
                 DebeziumDeserializationConverterFactory.DEFAULT;
         private SchemaChangeResolver schemaChangeResolver;

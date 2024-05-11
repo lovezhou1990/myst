@@ -320,6 +320,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
                                     "TaskGroupLocation: %s already exists",
                                     taskGroup.getTaskGroupLocation()));
                 }
+                //zhoulj 任务启动执行 2.6 开始发布到执行器中执行任务
                 deployLocalTask(taskGroup, classLoader, jars);
                 return TaskDeployState.success();
             }

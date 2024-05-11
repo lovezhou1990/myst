@@ -154,7 +154,7 @@ public class PhysicalPlanGenerator {
         // TODO Determine which tasks do not need to be restored according to state
         CopyOnWriteArrayList<PassiveCompletableFuture<PipelineStatus>>
                 waitForCompleteBySubPlanList = new CopyOnWriteArrayList<>();
-
+        //生成子计划
         Map<Integer, CheckpointPlan> checkpointPlans = new HashMap<>();
         final int totalPipelineNum = pipelines.size();
         Stream<SubPlan> subPlanStream =
