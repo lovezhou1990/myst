@@ -34,8 +34,8 @@ public class IndexInfo {
     private String kindAct;
     private String synTimeAct;
 
-    public IndexInfo(ReadonlyConfig config) {
-        index = config.get(SinkConfig.INDEX);
+    public IndexInfo(String index, ReadonlyConfig config) {
+        this.index = index;
         type = config.get(SinkConfig.INDEX_TYPE);
         if (config.getOptional(SinkConfig.PRIMARY_KEYS).isPresent()) {
             primaryKeys = config.get(SinkConfig.PRIMARY_KEYS).toArray(new String[0]);
