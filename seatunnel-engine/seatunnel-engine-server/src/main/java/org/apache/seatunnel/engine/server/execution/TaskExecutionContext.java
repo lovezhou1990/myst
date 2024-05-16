@@ -50,6 +50,7 @@ public class TaskExecutionContext {
     }
 
     public <E> InvocationFuture<E> sendToMember(Operation operation, Address memberID) {
+        //发送数据到 具体节点执行？
         return NodeEngineUtil.sendOperationToMemberNode(nodeEngine, operation, memberID);
     }
 

@@ -50,6 +50,7 @@ public class AssignSplitOperation<SplitT extends SourceSplit> extends Operation
 
     @Override
     public void run() throws Exception {
+        //？？ 这里是接受分配器任务的吗？
         SeaTunnelServer server = getService();
         RetryUtils.retryWithException(
                 () -> {

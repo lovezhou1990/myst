@@ -69,7 +69,7 @@ public class SeaTunnelSplitEnumeratorContext<SplitT extends SourceSplit>
             log.warn("No reader is obtained, skip this assign!");
             return;
         }
-
+        // 这里把分配器的内容序列化为 hazcast 对象， 由下游节点处理？
         List<byte[]> splitBytes =
                 splits.stream()
                         .map(split -> sneaky(() -> task.getSplitSerializer().serialize(split)))
