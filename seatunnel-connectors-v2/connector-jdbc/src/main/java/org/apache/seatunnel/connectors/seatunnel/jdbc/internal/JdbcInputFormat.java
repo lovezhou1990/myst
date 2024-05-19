@@ -94,7 +94,7 @@ public class JdbcInputFormat implements Serializable {
         try {
             splitTableSchema = tables.get(inputSplit.getTablePath()).getTableSchema();
             splitTableId = inputSplit.getTablePath().toString();
-
+            //zhoulj 分片查询？？？
             statement = chunkSplitter.generateSplitStatement(inputSplit, splitTableSchema);
             resultSet = statement.executeQuery();
             hasNext = resultSet.next();

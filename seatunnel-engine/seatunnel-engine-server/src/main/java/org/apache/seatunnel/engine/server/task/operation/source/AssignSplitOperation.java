@@ -51,6 +51,7 @@ public class AssignSplitOperation<SplitT extends SourceSplit> extends Operation
     @Override
     public void run() throws Exception {
         SeaTunnelServer server = getService();
+        // 怎么接受分片请求的？
         RetryUtils.retryWithException(
                 () -> {
                     SourceSeaTunnelTask<?, SplitT> task =

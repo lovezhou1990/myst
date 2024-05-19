@@ -40,6 +40,7 @@ public class SeaTunnelEngineExample {
         // Change Execution Mode to CLUSTER to use client mode, before do this, you should start
         // SeaTunnelEngineServerExample
         clientCommandArgs.setMasterType(MasterType.CLUSTER);
+        clientCommandArgs.setAsync(true);
         SeaTunnel.run(clientCommandArgs.buildCommand());
     }
 

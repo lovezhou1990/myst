@@ -167,7 +167,7 @@ public class JdbcSourceSplitEnumerator
         for (JdbcSourceSplit split : splits) {
             int ownerReader = getSplitOwner(split.splitId(), readerCount);
             LOG.debug("Assigning {} to {} reader.", split, ownerReader);
-
+            //zhoulj 一个读取器负责不同的split任务， split 应该是reader 的倍数？
             pendingSplits.computeIfAbsent(ownerReader, r -> new ArrayList<>()).add(split);
         }
     }

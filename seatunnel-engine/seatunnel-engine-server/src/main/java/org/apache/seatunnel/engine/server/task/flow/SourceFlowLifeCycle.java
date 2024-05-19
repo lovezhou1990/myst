@@ -226,6 +226,7 @@ public class SourceFlowLifeCycle<T, SplitT extends SourceSplit> extends ActionFl
 
     public void requestSplit() {
         try {
+            //zhoulj 发送分片请求的操作，  具体在哪里执行？
             runningTask
                     .getExecutionContext()
                     .sendToMember(

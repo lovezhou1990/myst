@@ -58,7 +58,7 @@ public class MySqlBinlogFetchTask implements FetchTask<SourceSplitBase> {
     public void execute(FetchTask.Context context) throws Exception {
         MySqlSourceFetchTaskContext sourceFetchContext = (MySqlSourceFetchTaskContext) context;
         taskRunning = true;
-
+        //zhoulj 这里实现了 debezium 与 Seatunnel 的集成对接？？
         MySqlStreamingChangeEventSource mySqlStreamingChangeEventSource =
                 new MySqlStreamingChangeEventSource(
                         sourceFetchContext.getDbzConnectorConfig(),
@@ -71,7 +71,7 @@ public class MySqlBinlogFetchTask implements FetchTask<SourceSplitBase> {
 
         BinlogSplitChangeEventSourceContext changeEventSourceContext =
                 new BinlogSplitChangeEventSourceContext();
-
+        // cdc 消息？
         mySqlStreamingChangeEventSource.execute(
                 changeEventSourceContext, sourceFetchContext.getOffsetContext());
     }

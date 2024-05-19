@@ -44,6 +44,7 @@ public class NodeEngineUtil {
 
     public static <E> InvocationFuture<E> sendOperationToMemberNode(
             NodeEngine nodeEngine, Operation operation, Address memberAddress) {
+        //zhoulj 向成员节点发送动作请求
         InvocationBuilder invocationBuilder =
                 nodeEngine
                         .getOperationService()

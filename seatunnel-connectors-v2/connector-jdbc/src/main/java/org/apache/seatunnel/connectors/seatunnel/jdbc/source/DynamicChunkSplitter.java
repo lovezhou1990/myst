@@ -115,7 +115,7 @@ public class DynamicChunkSplitter extends ChunkSplitter {
         }
 
         int chunkSize = config.getSplitSize();
-
+        //zhoulj 根据分片健的类型创建不同的分片枚举
         switch (splitColumnType.getSqlType()) {
             case TINYINT:
             case SMALLINT:
