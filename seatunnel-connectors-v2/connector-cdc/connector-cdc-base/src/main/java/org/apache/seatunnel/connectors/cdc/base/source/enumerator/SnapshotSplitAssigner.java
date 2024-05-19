@@ -174,6 +174,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             Iterator<SnapshotSplit> iterator = remainingSplits.iterator();
             SnapshotSplit split = iterator.next();
             iterator.remove();
+            // 最终将分区放到assignedSplits map 对象中
             assignedSplits.put(split.splitId(), split);
             context.getAssignedSnapshotSplit().put(split.splitId(), split);
             return Optional.of(split);
@@ -182,7 +183,9 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             TableId nextTable = remainingTables.pollFirst();
             if (nextTable != null) {
                 // split the given table into chunks (snapshot splits)
+                // 针对每个表生成 分片器， 每个表都要生成， 这里只是生成好分片器  还没有开始读取？
                 Collection<SnapshotSplit> splits = chunkSplitter.generateSplits(nextTable);
+                //准备好的 分割器， 并把已经生成了分割器的表加入到集合中。
                 remainingSplits.addAll(splits);
                 alreadyProcessedTables.add(nextTable);
                 return getNext();

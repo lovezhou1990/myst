@@ -74,6 +74,7 @@ public class SeaTunnelSplitEnumeratorContext<SplitT extends SourceSplit>
             return;
         }
         //zhoulj 发送分片请求 driver 端将生成好的分片策略发送给成员节点， 具体加载数据由成员节点进行加载
+        // 这里把分配器的内容序列化为 hazcast 对象， 由下游节点处理？
         List<byte[]> splitBytes =
                 splits.stream()
                         .map(split -> sneaky(() -> task.getSplitSerializer().serialize(split)))

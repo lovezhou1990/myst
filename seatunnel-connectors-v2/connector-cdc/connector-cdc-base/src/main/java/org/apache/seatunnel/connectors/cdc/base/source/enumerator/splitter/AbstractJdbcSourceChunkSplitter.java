@@ -60,7 +60,7 @@ public abstract class AbstractJdbcSourceChunkSplitter implements JdbcSourceChunk
         try (JdbcConnection jdbc = dialect.openJdbcConnection(sourceConfig)) {
             log.info("Start splitting table {} into chunks...", tableId);
             long start = System.currentTimeMillis();
-
+            // 获取分片的键
             Column splitColumn = getSplitColumn(jdbc, dialect, tableId);
             List<SnapshotSplit> splits = new ArrayList<>();
             if (splitColumn == null) {
@@ -86,6 +86,7 @@ public abstract class AbstractJdbcSourceChunkSplitter implements JdbcSourceChunk
 
                 // convert chunks into splits
                 SeaTunnelRowType splitType = getSplitType(splitColumn);
+                //zhoulj 根据总估算出的行数 计算出需要用多少 split 对数据进行读取操作。
                 for (int i = 0; i < chunks.size(); i++) {
                     ChunkRange chunk = chunks.get(i);
                     SnapshotSplit split =
@@ -140,8 +141,9 @@ public abstract class AbstractJdbcSourceChunkSplitter implements JdbcSourceChunk
                 distributionFactorUpper,
                 distributionFactorLower,
                 sampleShardingThreshold);
-
+        //zhoulj 根据分片键获取最大小值， 生成chunk 集合
         if (isEvenlySplitColumn(splitColumn)) {
+            //zhoulj 获取数据表中总数据行数（预估值）
             long approximateRowCnt = queryApproximateRowCnt(jdbc, tableId);
             double distributionFactor =
                     calculateDistributionFactor(tableId, min, max, approximateRowCnt);
@@ -381,9 +383,10 @@ public abstract class AbstractJdbcSourceChunkSplitter implements JdbcSourceChunk
             throws SQLException {
         Optional<PrimaryKey> primaryKey = dialect.getPrimaryKey(jdbc, tableId);
         Column splitColumn = null;
+        // 先用主键进行分片， 没有主键的情况下再用唯一键
         if (primaryKey.isPresent()) {
             List<String> pkColumns = primaryKey.get().getColumnNames();
-
+            // 有设置主键的情况下   只支持数字或字符串格式的主键进行分片处理
             Table table = dialect.queryTableSchema(jdbc, tableId).getTable();
             for (String pkColumn : pkColumns) {
                 Column column = table.columnWithName(pkColumn);
@@ -397,7 +400,7 @@ public abstract class AbstractJdbcSourceChunkSplitter implements JdbcSourceChunk
         } else {
             log.warn("No primary key found for table {}", tableId);
         }
-
+        // 获取唯一键，
         List<ConstraintKey> uniqueKeys = dialect.getUniqueKeys(jdbc, tableId);
         if (!uniqueKeys.isEmpty()) {
             Table table = dialect.queryTableSchema(jdbc, tableId).getTable();
