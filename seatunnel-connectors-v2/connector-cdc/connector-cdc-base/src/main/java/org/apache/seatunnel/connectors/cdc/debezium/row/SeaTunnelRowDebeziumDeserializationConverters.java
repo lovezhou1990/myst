@@ -189,7 +189,7 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
                 if (Objects.equals(fieldName, "id")) {
                     row.setField(i, beforeconvertedField);
                 } else if (Objects.equals(beforeconvertedField, afterconvertedField)) {
-                    //                    row.setField(i, "");
+                    row.setField(i, formatStr(afterconvertedField));
                 } else {
                     row.setField(i,formatStr(beforeconvertedField)
                                     + "->"

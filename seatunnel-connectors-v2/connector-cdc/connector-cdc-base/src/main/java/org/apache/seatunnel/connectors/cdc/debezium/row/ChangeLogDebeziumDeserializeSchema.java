@@ -17,12 +17,15 @@
 
 package org.apache.seatunnel.connectors.cdc.debezium.row;
 
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.kafka.connect.data.Field;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.api.table.catalog.TablePath;
 import org.apache.seatunnel.api.table.event.SchemaChangeEvent;
 import org.apache.seatunnel.api.table.event.handler.DataTypeChangeEventDispatcher;
 import org.apache.seatunnel.api.table.event.handler.DataTypeChangeEventHandler;
 import org.apache.seatunnel.api.table.type.*;
+import org.apache.seatunnel.connectors.cdc.base.option.ChangeLogMode;
 import org.apache.seatunnel.connectors.cdc.base.schema.SchemaChangeResolver;
 import org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils;
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConverterFactory;
@@ -41,8 +44,9 @@ import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.ZoneId;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.seatunnel.connectors.cdc.base.source.split.wartermark.WatermarkEvent.isSchemaChangeAfterWatermarkEvent;
@@ -65,6 +69,8 @@ public final class ChangeLogDebeziumDeserializeSchema
     private SeaTunnelDataType<SeaTunnelRow> resultTypeInfo;
     private Map<String, SeaTunnelRowDebeziumDeserializationConverters> tableRowConverters;
 
+    List<String> includeFields = new ArrayList<>();
+    List<String> excludeFields = new ArrayList<>();
     ChangeLogDebeziumDeserializeSchema(
             SeaTunnelDataType<SeaTunnelRow> physicalDataType,
             MetadataConverter[] metadataConverters,
@@ -84,6 +90,22 @@ public final class ChangeLogDebeziumDeserializeSchema
                         metadataConverters,
                         serverTimeZone,
                         userDefinedConverterFactory);
+    }
+
+    public List<String> getIncludeFields() {
+        return includeFields;
+    }
+
+    public void setIncludeFields(List<String> includeFields) {
+        this.includeFields = includeFields;
+    }
+
+    public List<String> getExcludeFields() {
+        return excludeFields;
+    }
+
+    public void setExcludeFields(List<String> excludeFields) {
+        this.excludeFields = excludeFields;
     }
 
     @Override
@@ -187,11 +209,39 @@ public final class ChangeLogDebeziumDeserializeSchema
 
             Schema afterSchema = valueSchema.field(Envelope.FieldName.AFTER).schema();
             Struct after = messageStruct.getStruct(Envelope.FieldName.AFTER);
+            // 先判断include 字段
+            Set<Field> validFields = new HashSet<>();
+            if (CollectionUtils.isNotEmpty(this.getIncludeFields())) {
+                validFields = beforeSchema.fields().stream()
+                        .filter(f -> this.getIncludeFields().contains(f.name())).collect(Collectors.toSet());
+            } else if (CollectionUtils.isNotEmpty(this.getExcludeFields())) {
+                validFields = beforeSchema.fields().stream()
+                        .filter(f -> !this.getExcludeFields().contains(f.name())).collect(Collectors.toSet());
+            }
+            if (CollectionUtils.isNotEmpty(validFields)) {
+                boolean iscollect = false;
+                for (Field validField : validFields) {
+                    Object beforeValue = before.get(validField);
+                    Object afterValue = after.get(validField);
+                    if (!Objects.equals(beforeValue, afterValue)) {
+                        iscollect = true;
+                        break;
+                    }
+                }
+                if (iscollect) {
+                    SeaTunnelRow row = converters.convert(record, before, beforeSchema, after, afterSchema);
+                    row.setRowKind(RowKind.UPDATE_AFTER);
+                    row.setTableId(tableId);
+                    collector.collect(row);
+                }
+            } else {
+                SeaTunnelRow row = converters.convert(record, before, beforeSchema, after, afterSchema);
+                row.setRowKind(RowKind.UPDATE_AFTER);
+                row.setTableId(tableId);
+                collector.collect(row);
+            }
 
-            SeaTunnelRow row = converters.convert(record, before, beforeSchema, after, afterSchema);
-            row.setRowKind(RowKind.UPDATE_AFTER);
-            row.setTableId(tableId);
-            collector.collect(row);
+
 
             //
             //            SeaTunnelRow after = extractAfterRow(converters, record, messageStruct,

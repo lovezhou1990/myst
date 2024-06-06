@@ -28,6 +28,7 @@ import org.apache.seatunnel.connectors.cdc.base.config.JdbcSourceConfig;
 import org.apache.seatunnel.connectors.cdc.base.config.SourceConfig;
 import org.apache.seatunnel.connectors.cdc.base.dialect.DataSourceDialect;
 import org.apache.seatunnel.connectors.cdc.base.dialect.JdbcDataSourceDialect;
+import org.apache.seatunnel.connectors.cdc.base.option.ChangeLogMode;
 import org.apache.seatunnel.connectors.cdc.base.option.JdbcSourceOptions;
 import org.apache.seatunnel.connectors.cdc.base.option.StartupMode;
 import org.apache.seatunnel.connectors.cdc.base.option.StopMode;
@@ -100,12 +101,17 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
         if (DeserializeFormat.CHANGELOG.equals(config.get(JdbcSourceOptions.FORMAT))) {
             SeaTunnelDataType<SeaTunnelRow> physicalRowType = dataType;
             String zoneId = config.get(JdbcSourceOptions.SERVER_TIME_ZONE);
-            return (DebeziumDeserializationSchema<T>)
-                    ChangeLogDebeziumDeserializeSchema.builder()
-                            .setPhysicalRowType(physicalRowType)
-                            .setResultTypeInfo(physicalRowType)
-                            .setServerTimeZone(ZoneId.of(zoneId))
-                            .build();
+            List<String> includeFields = config.get(ChangeLogMode.includeFields);
+            List<String> excludeFields = config.get(ChangeLogMode.excludeFields);
+
+            ChangeLogDebeziumDeserializeSchema build = ChangeLogDebeziumDeserializeSchema.builder()
+                    .setPhysicalRowType(physicalRowType)
+                    .setResultTypeInfo(physicalRowType)
+                    .setServerTimeZone(ZoneId.of(zoneId))
+                    .build();
+            build.setExcludeFields(excludeFields);
+            build.setIncludeFields(includeFields);
+            return (DebeziumDeserializationSchema<T>)build;
         }
 
         SeaTunnelDataType<SeaTunnelRow> physicalRowType = dataType;
