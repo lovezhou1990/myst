@@ -83,8 +83,10 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
 
     private int maxReaderSize;
     private Set<Long> unfinishedReaders;
+    //zhoulj 执行机器具体的地址
     private Map<TaskLocation, Address> taskMemberMapping;
     private Map<Long, TaskLocation> taskIDToTaskLocationMapping;
+    //zhoulj 任务编号>执行机器地址映射？
     private Map<Integer, TaskLocation> taskIndexToTaskLocationMapping;
 
     private volatile SeaTunnelTaskState currState;
@@ -241,10 +243,12 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
         getEnumerator().handleSourceEvent(subtaskId, sourceEvent);
     }
 
+    //zhoulj 添加任务成员的映射（具体映射的什么
     public void addTaskMemberMapping(TaskLocation taskID, Address memberAdder) {
         taskMemberMapping.put(taskID, memberAdder);
         taskIDToTaskLocationMapping.put(taskID.getTaskID(), taskID);
         taskIndexToTaskLocationMapping.put(taskID.getTaskIndex(), taskID);
+        //将任务id放入 未完成的读取器任务
         unfinishedReaders.add(taskID.getTaskID());
     }
 
@@ -277,6 +281,7 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
     }
 
     public void readerFinished(long taskID) {
+        //zhoulj 读取任务完成
         unfinishedReaders.remove(taskID);
         if (unfinishedReaders.isEmpty()) {
             prepareCloseStatus = true;
@@ -287,6 +292,7 @@ public class SourceSplitEnumeratorTask<SplitT extends SourceSplit> extends Coord
         switch (currState) {
             case INIT:
                 currState = WAITING_RESTORE;
+                // 这里的任务状态发送到哪里去了（整个集群， 有什么作用）？
                 reportTaskStatus(WAITING_RESTORE);
                 break;
             case WAITING_RESTORE:

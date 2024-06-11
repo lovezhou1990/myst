@@ -192,6 +192,7 @@ public abstract class IncrementalSource<T, C extends SourceConfig>
         return new IncrementalSourceRecordEmitter<>(deserializationSchema, offsetFactory, context);
     }
 
+    // 分片枚举器的创建
     @Override
     public SourceSplitEnumerator<SourceSplitBase, PendingSplitsState> createEnumerator(
             SourceSplitEnumerator.Context<SourceSplitBase> enumeratorContext) throws Exception {
@@ -205,6 +206,7 @@ public abstract class IncrementalSource<T, C extends SourceConfig>
                         new HashSet<>(remainingTables),
                         new HashMap<>(),
                         new HashMap<>());
+        //zhoulj 重点：根据配置创建枚举器
         if (sourceConfig.getStartupConfig().getStartupMode() == StartupMode.INITIAL) {
             try {
 
