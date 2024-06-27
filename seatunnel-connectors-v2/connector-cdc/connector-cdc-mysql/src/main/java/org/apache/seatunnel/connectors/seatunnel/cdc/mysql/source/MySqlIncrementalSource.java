@@ -132,7 +132,6 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
     @Override
     public OffsetFactory createOffsetFactory(ReadonlyConfig config) {
         return new BinlogOffsetFactory(
-                (MySqlSourceConfigFactory) configFactory,
-                (JdbcDataSourceDialect) dataSourceDialect);
+                (MySqlSourceConfigFactory) configFactory, (MySqlDialect) dataSourceDialect);
     }
 }
