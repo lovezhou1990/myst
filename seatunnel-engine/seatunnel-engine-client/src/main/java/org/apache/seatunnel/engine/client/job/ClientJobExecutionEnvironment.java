@@ -30,6 +30,8 @@ import org.apache.seatunnel.engine.core.parse.MultipleTableJobConfigParser;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -106,8 +108,9 @@ public class ClientJobExecutionEnvironment extends AbstractJobEnvironment {
                 isStartWithSavePoint);
     }
 
+    @VisibleForTesting
     @Override
-    protected LogicalDag getLogicalDag() {
+    public LogicalDag getLogicalDag() {
         //重点：通过任务配置文件生成执行计划 client 1
         ImmutablePair<List<Action>, Set<URL>> immutablePair = getJobConfigParser().parse(null);
         actions.addAll(immutablePair.getLeft());
