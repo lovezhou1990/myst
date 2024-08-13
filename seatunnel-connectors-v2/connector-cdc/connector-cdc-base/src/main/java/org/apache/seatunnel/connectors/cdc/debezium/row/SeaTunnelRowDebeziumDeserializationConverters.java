@@ -169,19 +169,19 @@ public class SeaTunnelRowDebeziumDeserializationConverters implements Serializab
             if (beforefield == null && afterfield == null) {
                 row.setField(i, null);
             } else if (beforefield == null && afterfield != null) {
-                Object afterValue = afterstruct.get(fieldName);
+                Object afterValue = afterstruct.getWithoutDefault(fieldName);
                 row.setField(i, " ->" + formatStr(afterValue));
             } else if (beforefield != null && afterfield == null) {
-                Object beforeValue = beforestruct.get(fieldName);
+                Object beforeValue = beforestruct.getWithoutDefault(fieldName);
                 row.setField(i, formatStr(beforeValue) + "-> ");
             } else {
-                Object beforefieldValue = beforestruct.get(fieldName);
+                Object beforefieldValue = beforestruct.getWithoutDefault(fieldName);
                 Schema beforefieldSchema = beforefield.schema();
                 Object beforeconvertedField =
                         SeaTunnelRowDebeziumDeserializationConverters.convertField(
                                 physicalConverters[i], beforefieldValue, beforefieldSchema);
 
-                Object afterfieldValue = afterstruct.get(fieldName);
+                Object afterfieldValue = afterstruct.getWithoutDefault(fieldName);
                 Schema afterfieldSchema = afterfield.schema();
                 Object afterconvertedField =
                         SeaTunnelRowDebeziumDeserializationConverters.convertField(
