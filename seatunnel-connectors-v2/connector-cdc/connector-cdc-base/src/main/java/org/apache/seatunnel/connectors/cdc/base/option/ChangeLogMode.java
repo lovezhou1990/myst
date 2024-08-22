@@ -2,9 +2,12 @@ package org.apache.seatunnel.connectors.cdc.base.option;
 
 import org.apache.seatunnel.api.configuration.Option;
 import org.apache.seatunnel.api.configuration.Options;
+import org.apache.seatunnel.shade.com.fasterxml.jackson.core.type.TypeReference;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author zhoulj(周利军) [1217102780@qq.com]
@@ -17,14 +20,14 @@ import java.util.List;
  */
 public class ChangeLogMode {
 
-    public static final Option<List<String>> includeFields =
+    public static final Option<Map<String, Set<String>>> includeFields =
             Options.key("changelog.include_fields")
-                    .listType(String.class)
+                    .type(new TypeReference<Map<String,Set<String>>>() {})
                     .noDefaultValue()
                     .withDescription("需要包含的字段名称");
-    public static final Option<List<String>> excludeFields =
+    public static final Option<Map<String,Set<String>>> excludeFields =
             Options.key("changelog.exclude_fields")
-                    .listType(String.class)
+                    .type(new TypeReference<Map<String,Set<String>>>() {})
                     .noDefaultValue()
                     .withDescription("需要排除的字段名称");
 

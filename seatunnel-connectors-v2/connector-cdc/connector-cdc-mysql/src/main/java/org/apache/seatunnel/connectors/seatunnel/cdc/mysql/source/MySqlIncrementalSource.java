@@ -45,6 +45,8 @@ import org.apache.seatunnel.connectors.seatunnel.jdbc.catalog.JdbcCatalogOptions
 
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceConfig>
         implements SupportParallelism {
@@ -101,8 +103,8 @@ public class MySqlIncrementalSource<T> extends IncrementalSource<T, JdbcSourceCo
         if (DeserializeFormat.CHANGELOG.equals(config.get(JdbcSourceOptions.FORMAT))) {
             SeaTunnelDataType<SeaTunnelRow> physicalRowType = dataType;
             String zoneId = config.get(JdbcSourceOptions.SERVER_TIME_ZONE);
-            List<String> includeFields = config.get(ChangeLogMode.includeFields);
-            List<String> excludeFields = config.get(ChangeLogMode.excludeFields);
+            Map<String,Set<String>> includeFields = config.get(ChangeLogMode.includeFields);
+            Map<String, Set<String>> excludeFields = config.get(ChangeLogMode.excludeFields);
 
             ChangeLogDebeziumDeserializeSchema build = ChangeLogDebeziumDeserializeSchema.builder()
                     .setPhysicalRowType(physicalRowType)

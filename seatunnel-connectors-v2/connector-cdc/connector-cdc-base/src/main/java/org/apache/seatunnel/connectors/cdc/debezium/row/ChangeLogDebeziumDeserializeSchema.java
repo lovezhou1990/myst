@@ -18,6 +18,7 @@
 package org.apache.seatunnel.connectors.cdc.debezium.row;
 
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.data.Field;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.api.table.catalog.TablePath;
@@ -69,8 +70,8 @@ public final class ChangeLogDebeziumDeserializeSchema
     private SeaTunnelDataType<SeaTunnelRow> resultTypeInfo;
     private Map<String, SeaTunnelRowDebeziumDeserializationConverters> tableRowConverters;
 
-    List<String> includeFields = new ArrayList<>();
-    List<String> excludeFields = new ArrayList<>();
+    Map<String,Set<String>> includeFields = new HashMap<>();
+    Map<String,Set<String>> excludeFields = new HashMap<>();
     ChangeLogDebeziumDeserializeSchema(
             SeaTunnelDataType<SeaTunnelRow> physicalDataType,
             MetadataConverter[] metadataConverters,
@@ -92,19 +93,19 @@ public final class ChangeLogDebeziumDeserializeSchema
                         userDefinedConverterFactory);
     }
 
-    public List<String> getIncludeFields() {
+    public Map<String,Set<String>> getIncludeFields() {
         return includeFields;
     }
 
-    public void setIncludeFields(List<String> includeFields) {
+    public void setIncludeFields(Map<String,Set<String>> includeFields) {
         this.includeFields = includeFields;
     }
 
-    public List<String> getExcludeFields() {
+    public Map<String,Set<String>> getExcludeFields() {
         return excludeFields;
     }
 
-    public void setExcludeFields(List<String> excludeFields) {
+    public void setExcludeFields(Map<String,Set<String>> excludeFields) {
         this.excludeFields = excludeFields;
     }
 
@@ -203,7 +204,6 @@ public final class ChangeLogDebeziumDeserializeSchema
             delete.setTableId(tableId);
             collector.collect(delete);
         } else {
-
             Schema beforeSchema = valueSchema.field(Envelope.FieldName.BEFORE).schema();
             Struct before = messageStruct.getStruct(Envelope.FieldName.BEFORE);
 
@@ -211,12 +211,22 @@ public final class ChangeLogDebeziumDeserializeSchema
             Struct after = messageStruct.getStruct(Envelope.FieldName.AFTER);
             // 先判断include 字段
             Set<Field> validFields = new HashSet<>();
-            if (CollectionUtils.isNotEmpty(this.getIncludeFields())) {
+            String schemaName = beforeSchema.schema().name();
+            if (schemaName.startsWith("mysql_binlog_source.")) {
+                schemaName = StringUtils.replace(schemaName, "mysql_binlog_source.","");
+            }
+            if (schemaName.endsWith(".Value")) {
+                schemaName = schemaName.substring(0, schemaName.length()-6);
+            }
+
+            Set<String> includeFields = this.getIncludeFields().get(schemaName);
+            Set<String> excludeFields = this.getExcludeFields().get(schemaName);
+            if (CollectionUtils.isNotEmpty(includeFields)) {
                 validFields = beforeSchema.fields().stream()
-                        .filter(f -> this.getIncludeFields().contains(f.name())).collect(Collectors.toSet());
-            } else if (CollectionUtils.isNotEmpty(this.getExcludeFields())) {
+                        .filter(f -> includeFields.contains(f.name())).collect(Collectors.toSet());
+            } else if (CollectionUtils.isNotEmpty(excludeFields)) {
                 validFields = beforeSchema.fields().stream()
-                        .filter(f -> !this.getExcludeFields().contains(f.name())).collect(Collectors.toSet());
+                        .filter(f -> !excludeFields.contains(f.name())).collect(Collectors.toSet());
             }
             if (CollectionUtils.isNotEmpty(validFields)) {
                 boolean iscollect = false;
