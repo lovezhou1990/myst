@@ -31,5 +31,9 @@ public class PageInfo implements Serializable {
 
     private Integer batchSize;
     private String pageField;
+    /**
+     * 动态获取总页数
+     */
+    private String dynamPagesumField;
     private Long pageIndex;
 }

@@ -50,6 +50,12 @@ public class HttpConfig {
                     .defaultValue("page")
                     .withDescription(
                             "this parameter is used to specify the page field name in the request parameter");
+    public static final Option<String> dynamPagesumField =
+            Options.key("dynam_pagesum_field")
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription(
+                            "this parameter is used to specify the page field name in the request parameter");
     public static final Option<Map<String, String>> PAGEING =
             Options.key("pageing").mapType().noDefaultValue().withDescription("pageing");
     public static final Option<HttpRequestMethod> METHOD =

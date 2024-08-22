@@ -109,6 +109,9 @@ public class HttpSource extends AbstractSingleSplitSource<SeaTunnelRow> {
             if (pageConfig.hasPath(HttpConfig.PAGE_FIELD.key())) {
                 pageInfo.setPageField(pageConfig.getString(HttpConfig.PAGE_FIELD.key()));
             }
+            if (pageConfig.hasPath(HttpConfig.dynamPagesumField.key())) {
+                pageInfo.setDynamPagesumField(pageConfig.getString(HttpConfig.dynamPagesumField.key()));
+            }
         }
     }
 

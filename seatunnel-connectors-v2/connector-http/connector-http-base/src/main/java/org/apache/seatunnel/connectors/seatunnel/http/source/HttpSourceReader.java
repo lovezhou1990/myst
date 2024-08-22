@@ -17,6 +17,8 @@
 
 package org.apache.seatunnel.connectors.seatunnel.http.source;
 
+import net.minidev.json.JSONArray;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.seatunnel.api.serialization.DeserializationSchema;
 import org.apache.seatunnel.api.source.Boundedness;
 import org.apache.seatunnel.api.source.Collector;
@@ -160,6 +162,7 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
                 noMoreElementFlag = false;
                 Long pageIndex = 1L;
                 while (!noMoreElementFlag) {
+                    log.error("开始加载第{}页的数据",pageIndex);
                     PageInfo info = pageInfoOptional.get();
                     // increment page
                     info.setPageIndex(pageIndex);
@@ -186,6 +189,12 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     }
 
     private void collect(Collector<SeaTunnelRow> output, String data) throws IOException {
+        if ( pageInfoOptional.isPresent()) {
+            String pageSum = JsonUtils.stringToJsonNode(getPageInfoOptional(data)).toString();
+            if (NumberUtils.isDigits(pageSum)) {
+                pageInfoOptional.get().setTotalPageSize(Long.parseLong(pageSum));
+            }
+        }
         if (contentJson != null) {
             data = JsonUtils.stringToJsonNode(getPartOfJson(data)).toString();
         }
@@ -257,6 +266,17 @@ public class HttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRow> {
     private String getPartOfJson(String data) {
         ReadContext jsonReadContext = JsonPath.using(jsonConfiguration).parse(data);
         return JsonUtils.toJsonString(jsonReadContext.read(JsonPath.compile(contentJson)));
+    }
+    private String getPageInfoOptional(String data) {
+        ReadContext jsonReadContext = JsonPath.using(jsonConfiguration).parse(data);
+
+        Object read = jsonReadContext.read(
+                JsonPath.compile(pageInfoOptional.get().getDynamPagesumField()));
+        if (read!=null && read instanceof JSONArray) {
+            JSONArray result = (JSONArray)read;
+            return result.get(0).toString();
+        }
+        return "";
     }
 
     private List<List<String>> dataFlip(List<List<String>> results) {
