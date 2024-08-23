@@ -17,20 +17,12 @@
 
 package org.apache.seatunnel.api.table.catalog;
 
+import org.apache.seatunnel.api.table.type.*;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigFactory;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigObject;
 import org.apache.seatunnel.shade.com.typesafe.config.ConfigValue;
 
-import org.apache.seatunnel.api.table.type.ArrayType;
-import org.apache.seatunnel.api.table.type.BasicType;
-import org.apache.seatunnel.api.table.type.DecimalType;
-import org.apache.seatunnel.api.table.type.LocalTimeType;
-import org.apache.seatunnel.api.table.type.MapType;
-import org.apache.seatunnel.api.table.type.PrimitiveByteArrayType;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
-import org.apache.seatunnel.api.table.type.SqlType;
 import org.apache.seatunnel.common.exception.CommonError;
 
 public class SeaTunnelDataTypeConvertorUtil {
@@ -121,6 +113,9 @@ public class SeaTunnelDataTypeConvertorUtil {
         }
         if (column.startsWith(SqlType.DECIMAL.name())) {
             return parseDecimalType(columnStr);
+        }
+        if (column.startsWith(SqlType.STRING.name())) {
+            return parsVarcheType(columnStr);
         }
         if (column.trim().startsWith("{")) {
             return parseRowType(columnStr);
@@ -231,5 +226,9 @@ public class SeaTunnelDataTypeConvertorUtil {
         int precision = Integer.parseInt(decimalInfos[0].replaceAll("\\D", ""));
         int scale = Integer.parseInt(decimalInfos[1].replaceAll("\\D", ""));
         return new DecimalType(precision, scale);
+    }
+    private static SeaTunnelDataType<?> parsVarcheType(String columnStr) {
+        int length = Integer.parseInt(columnStr.replaceAll("\\D", ""));
+        return new VarcharType(length);
     }
 }

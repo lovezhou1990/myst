@@ -446,7 +446,7 @@ public class MySqlTypeConverter implements TypeConverter<BasicTypeDefine<MysqlTy
                     builder.nativeType(MysqlType.LONGTEXT);
                     builder.columnType(MYSQL_LONGTEXT);
                     builder.dataType(MYSQL_LONGTEXT);
-                } else if (column.getColumnLength() < POWER_2_8) {
+                } else if (column.getColumnLength() < 1001) {
                     builder.nativeType(MysqlType.VARCHAR);
                     builder.columnType(
                             String.format("%s(%s)", MYSQL_VARCHAR, column.getColumnLength()));

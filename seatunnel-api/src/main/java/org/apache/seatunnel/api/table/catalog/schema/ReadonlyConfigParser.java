@@ -17,6 +17,11 @@
 
 package org.apache.seatunnel.api.table.catalog.schema;
 
+import org.apache.commons.collections4.MapUtils;
+import org.apache.seatunnel.api.configuration.Option;
+import org.apache.seatunnel.api.configuration.Options;
+import org.apache.seatunnel.api.table.type.VarcharType;
+import org.apache.seatunnel.shade.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.seatunnel.shade.com.fasterxml.jackson.databind.JsonNode;
 
 import org.apache.seatunnel.api.configuration.ReadonlyConfig;
@@ -90,13 +95,28 @@ public class ReadonlyConfigParser implements TableSchemaParser<ReadonlyConfig> {
             Map<String, String> fieldsMap = JsonUtils.toStringMap(jsonNode);
             int fieldsNum = fieldsMap.size();
             List<Column> columns = new ArrayList<>(fieldsNum);
+            Option<Map<String, Object>> primaryKey = Options.key("schema.primaryKey")
+                    .type(new TypeReference<Map<String, Object>>() {})
+                    .noDefaultValue()
+                    .withDescription("SeaTunnel Schema Fields");
+            Map<String, Object> stringObjectMap = schemaConfig.get(primaryKey);
             for (Map.Entry<String, String> entry : fieldsMap.entrySet()) {
                 String key = entry.getKey();
                 String value = entry.getValue();
                 SeaTunnelDataType<?> dataType =
                         SeaTunnelDataTypeConvertorUtil.deserializeSeaTunnelDataType(key, value);
-                PhysicalColumn column = PhysicalColumn.of(key, dataType, 0, true, null, null);
-                columns.add(column);
+                if (dataType instanceof VarcharType) {
+                    List<String> pkList = new ArrayList<>();
+                    if (MapUtils.isNotEmpty(stringObjectMap)) {
+                        pkList = (List)stringObjectMap.get("columnNames");
+                    }
+                    PhysicalColumn column = PhysicalColumn.of(key, dataType, ((VarcharType)dataType).getLength(), pkList.contains(key.toLowerCase())?false:true, null, null);
+                    columns.add(column);
+                } else {
+                    PhysicalColumn column = PhysicalColumn.of(key, dataType, 0, true, null, null);
+                    columns.add(column);
+                }
+
             }
             return columns;
         }
