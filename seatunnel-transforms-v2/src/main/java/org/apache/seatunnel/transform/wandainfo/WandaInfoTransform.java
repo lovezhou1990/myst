@@ -17,6 +17,7 @@
 
 package org.apache.seatunnel.transform.wandainfo;
 
+import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.catalog.Column;
 import org.apache.seatunnel.api.table.catalog.PhysicalColumn;
@@ -26,6 +27,9 @@ import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
 import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
 import org.apache.seatunnel.common.exception.CommonError;
+import org.apache.seatunnel.connectors.seatunnel.http.client.HttpClientProvider;
+import org.apache.seatunnel.connectors.seatunnel.wanda.source.config.WandaSourceParameter;
+import org.apache.seatunnel.shade.com.typesafe.config.Config;
 import org.apache.seatunnel.transform.common.MultipleFieldOutputTransform;
 import org.apache.seatunnel.transform.common.SeaTunnelRowAccessor;
 import org.apache.seatunnel.transform.exception.TransformCommonError;
@@ -46,10 +50,17 @@ public class WandaInfoTransform extends MultipleFieldOutputTransform {
     private List<Integer> fieldOriginalIndexes;
     private List<SeaTunnelDataType<?>> fieldTypes;
 
+    protected HttpClientProvider httpClient;
+
     public WandaInfoTransform(WandaInfoTransformConfig copyTransformConfig, CatalogTable catalogTable) {
         super(catalogTable);
         this.config = copyTransformConfig;
         SeaTunnelRowType seaTunnelRowType = catalogTable.getTableSchema().toPhysicalRowDataType();
+        WandaSourceParameter wandaSourceParameter = new WandaSourceParameter();
+        wandaSourceParameter.buildWithConfig(copyTransformConfig.getBaseConfig(), null);
+        httpClient = new HttpClientProvider(wandaSourceParameter);
+        Config schemaConfig = copyTransformConfig.getBaseConfig().getConfig("schema");
+        System.out.println(schemaConfig);
     }
 
     @Override

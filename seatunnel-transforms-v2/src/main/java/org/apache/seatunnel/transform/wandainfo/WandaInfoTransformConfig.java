@@ -23,6 +23,7 @@ import org.apache.seatunnel.api.configuration.ReadonlyConfig;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import java.io.Serializable;
 import java.util.LinkedHashMap;
@@ -31,7 +32,8 @@ import java.util.Optional;
 
 @Getter
 @Setter
-public class WandaInfoTransformConfig implements Serializable {
+public class WandaInfoTransformConfig  implements Serializable {
+    public Config baseConfig;
     public static final Option<String> url =
             Options.key("url")
                     .stringType()
@@ -80,8 +82,9 @@ public class WandaInfoTransformConfig implements Serializable {
 //        } else {
 //            fields.put(config.get(DEST_FIELD), config.get(SRC_FIELD));
 //        }
-
+        Config baseConfig = config.toConfig();
         WandaInfoTransformConfig copyTransformConfig = new WandaInfoTransformConfig();
+        copyTransformConfig.setBaseConfig(baseConfig);
         return copyTransformConfig;
     }
 }

@@ -25,6 +25,7 @@ import org.apache.seatunnel.api.table.factory.TableTransformFactory;
 import org.apache.seatunnel.api.table.factory.TableTransformFactoryContext;
 
 import com.google.auto.service.AutoService;
+import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 @AutoService(Factory.class)
 public class WandaInfoTransformFactory implements TableTransformFactory {
