@@ -102,7 +102,15 @@ public class TransformFlowLifeCycle<T> extends ActionFlowLifeCycle
             }
             if (outputData != null) {
                 // todo log metrics
-                collector.collect(new Record<>(outputData));
+                if (outputData instanceof List) {
+                    List<T> list = (List<T>) outputData;
+                    for (T t : list) {
+                        collector.collect(new Record<>(t));
+                    }
+                } else {
+                    collector.collect(new Record<>(outputData));
+                }
+
             }
         }
     }

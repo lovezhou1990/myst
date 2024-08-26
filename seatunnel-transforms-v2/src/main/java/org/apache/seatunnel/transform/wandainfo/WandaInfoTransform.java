@@ -17,50 +17,46 @@
 
 package org.apache.seatunnel.transform.wandainfo;
 
-import org.apache.seatunnel.api.configuration.ReadonlyConfig;
+import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.ReadContext;
+import lombok.SneakyThrows;
 import org.apache.seatunnel.api.table.catalog.CatalogTable;
+import org.apache.seatunnel.api.table.catalog.CatalogTableUtil;
 import org.apache.seatunnel.api.table.catalog.Column;
 import org.apache.seatunnel.api.table.catalog.PhysicalColumn;
-import org.apache.seatunnel.api.table.type.ArrayType;
-import org.apache.seatunnel.api.table.type.MapType;
-import org.apache.seatunnel.api.table.type.SeaTunnelDataType;
-import org.apache.seatunnel.api.table.type.SeaTunnelRow;
-import org.apache.seatunnel.api.table.type.SeaTunnelRowType;
+import org.apache.seatunnel.api.table.type.*;
 import org.apache.seatunnel.common.exception.CommonError;
-import org.apache.seatunnel.connectors.seatunnel.http.client.HttpClientProvider;
+import org.apache.seatunnel.common.utils.JsonUtils;
+import org.apache.seatunnel.connectors.seatunnel.http.client.HttpResponse;
+import org.apache.seatunnel.connectors.seatunnel.http.exception.HttpConnectorErrorCode;
+import org.apache.seatunnel.connectors.seatunnel.http.exception.HttpConnectorException;
 import org.apache.seatunnel.connectors.seatunnel.wanda.source.config.WandaSourceParameter;
-import org.apache.seatunnel.shade.com.typesafe.config.Config;
+import org.apache.seatunnel.shade.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.seatunnel.transform.common.MultipleFieldOutputTransform;
 import org.apache.seatunnel.transform.common.SeaTunnelRowAccessor;
-import org.apache.seatunnel.transform.exception.TransformCommonError;
+import org.apache.seatunnel.transform.wandainfo.http.WandaInfoHttpClientProvider;
 
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class WandaInfoTransform extends MultipleFieldOutputTransform {
     public static final String PLUGIN_NAME = "WandaInfo";
 
     private final WandaInfoTransformConfig config;
-    private List<String> fieldNames;
-    private List<Integer> fieldOriginalIndexes;
-    private List<SeaTunnelDataType<?>> fieldTypes;
+    private final WandaSourceParameter wandaSourceParameter;
 
-    protected HttpClientProvider httpClient;
+    private final CatalogTable wandaCatalogTable;
+
 
     public WandaInfoTransform(WandaInfoTransformConfig copyTransformConfig, CatalogTable catalogTable) {
         super(catalogTable);
         this.config = copyTransformConfig;
-        SeaTunnelRowType seaTunnelRowType = catalogTable.getTableSchema().toPhysicalRowDataType();
-        WandaSourceParameter wandaSourceParameter = new WandaSourceParameter();
-        wandaSourceParameter.buildWithConfig(copyTransformConfig.getBaseConfig(), null);
-        httpClient = new HttpClientProvider(wandaSourceParameter);
-        Config schemaConfig = copyTransformConfig.getBaseConfig().getConfig("schema");
-        System.out.println(schemaConfig);
+        this.wandaSourceParameter = new WandaSourceParameter();
+        this.wandaSourceParameter.buildWithConfig(copyTransformConfig.getBaseConfig(), null);
+        this.wandaCatalogTable = CatalogTableUtil.buildWithConfig(copyTransformConfig.getBaseConfig());
     }
 
     @Override
@@ -68,58 +64,109 @@ public class WandaInfoTransform extends MultipleFieldOutputTransform {
         return PLUGIN_NAME;
     }
 
-    private void initOutputFields(
-            SeaTunnelRowType inputRowType, LinkedHashMap<String, String> fields) {
-        List<String> fieldNames = new ArrayList<>();
-        List<Integer> fieldOriginalIndexes = new ArrayList<>();
-        List<SeaTunnelDataType<?>> fieldsType = new ArrayList<>();
-        for (Map.Entry<String, String> field : fields.entrySet()) {
-            String srcField = field.getValue();
-            int srcFieldIndex;
-            try {
-                srcFieldIndex = inputRowType.indexOf(srcField);
-            } catch (IllegalArgumentException e) {
-                throw TransformCommonError.cannotFindInputFieldError(getPluginName(), srcField);
-            }
-            fieldNames.add(field.getKey());
-            fieldOriginalIndexes.add(srcFieldIndex);
-            fieldsType.add(inputRowType.getFieldType(srcFieldIndex));
-        }
-        this.fieldNames = fieldNames;
-        this.fieldOriginalIndexes = fieldOriginalIndexes;
-        this.fieldTypes = fieldsType;
-    }
-
     @Override
     protected Column[] getOutputColumns() {
-        if (inputCatalogTable == null) {
-            Column[] columns = new Column[fieldNames.size()];
-            for (int i = 0; i < fieldNames.size(); i++) {
-                columns[i] =
-                        PhysicalColumn.of(fieldNames.get(i), fieldTypes.get(i), 200, true, "", "");
-            }
-            return columns;
-        }
-
         Map<String, Column> catalogTableColumns =
-                inputCatalogTable.getTableSchema().getColumns().stream()
+                wandaCatalogTable.getTableSchema().getColumns().stream()
                         .collect(Collectors.toMap(column -> column.getName(), column -> column));
 
         List<Column> columns = new ArrayList<>();
+
+        for (Column srcColumn : catalogTableColumns.values()) {
+            PhysicalColumn destColumn =
+                    PhysicalColumn.of(
+                            srcColumn.getName(),
+                            srcColumn.getDataType(),
+                            srcColumn.getColumnLength(),
+                            srcColumn.isNullable(),
+                            srcColumn.getDefaultValue(),
+                            srcColumn.getComment());
+            columns.add(destColumn);
+        }
         return columns.toArray(new Column[0]);
     }
-
+    private String getPartOfJson(String data) {
+        String jsonString = JsonUtils.toJsonString(data);
+        return jsonString;
+    }
+    @SneakyThrows
     @Override
     protected Object[] getOutputFieldValues(SeaTunnelRowAccessor inputRow) {
-        Object[] fieldValues = new Object[fieldNames.size()];
-        for (int i = 0; i < fieldOriginalIndexes.size(); i++) {
-            fieldValues[i] =
-                    clone(
-                            fieldNames.get(i),
-                            fieldTypes.get(i),
-                            inputRow.getField(fieldOriginalIndexes.get(i)));
+
+        WandaInfoHttpClientProvider  httpClient= new WandaInfoHttpClientProvider(wandaSourceParameter);
+        HttpResponse response =
+                httpClient.execute(
+                        this.wandaSourceParameter.getUrl(),
+                        this.wandaSourceParameter.getMethod().getMethod(),
+                        this.wandaSourceParameter.getHeaders(),
+                        this.wandaSourceParameter.getParams(),
+                        this.wandaSourceParameter.getBody());
+        if (response.getCode() >= 200 && response.getCode() <= 207) {
+            String content = response.getContent();
+            Option[] DEFAULT_OPTIONS = {
+                    Option.SUPPRESS_EXCEPTIONS, Option.ALWAYS_RETURN_LIST, Option.DEFAULT_PATH_LEAF_TO_NULL
+            };
+
+            ReadContext jsonReadContext = JsonPath.using(
+                    Configuration.defaultConfiguration().addOptions(DEFAULT_OPTIONS)
+            ).parse(content);
+            String bodyString = JsonUtils.toJsonString(jsonReadContext.read(JsonPath.compile(
+                    this.config.getBaseConfig().getString("content_field"))));
+
+
+            JsonNode data = JsonUtils.stringToJsonNode(bodyString);
+            Column[] outputColumns = this.getOutputColumns();
+            Object[] fieldValues = new Object[outputColumns.length];
+            if (data.isArray()) {
+                for (int i = 0; i < data.size(); i++) {
+                    JsonNode jsonNode = data.get(i);
+                    for (int j = 0; j < outputColumns.length; j++) {
+                        Column outputColumn = outputColumns[j];
+
+                        String name = outputColumn.getName();
+//                        JsonNode jsonNode = data.get(name);
+                        fieldValues[j] = getValueByName(jsonNode, outputColumn);
+
+                    }
+                }
+            }
+
+
+
+            for (int i = 0; i < outputColumns.length; i++) {
+                Column outputColumn = outputColumns[i];
+
+                String name = outputColumn.getName();
+                JsonNode jsonNode = data.get(name);
+                fieldValues[i] = getValueByName(jsonNode, outputColumn);
+
+            }
+            return fieldValues;
+        } else {
+            String msg =
+                    String.format(
+                            "http client execute exception, http response status code:[%s], content:[%s]",
+                            response.getCode(), response.getContent());
+            throw new HttpConnectorException(HttpConnectorErrorCode.REQUEST_FAILED, msg);
         }
-        return fieldValues;
+    }
+
+    public Object getValueByName(JsonNode jsonNode, Column outputColumn){
+        if (jsonNode == null) {
+            return null;
+        }else if (Objects.equals(outputColumn.getDataType().getSqlType(), SqlType.STRING)) {
+            return jsonNode.asText();
+        }else if (Objects.equals(outputColumn.getDataType().getSqlType(), SqlType.BOOLEAN)) {
+            return jsonNode.asBoolean();
+        }else if (Objects.equals(outputColumn.getDataType().getSqlType(), SqlType.INT)) {
+            return jsonNode.asInt();
+        }else if (Objects.equals(outputColumn.getDataType().getSqlType(), SqlType.BIGINT)) {
+            return jsonNode.asLong();
+        }else if (Objects.equals(outputColumn.getDataType().getSqlType(), SqlType.DOUBLE)) {
+            return jsonNode.asDouble();
+        }else {
+            return jsonNode.textValue();
+        }
     }
 
     private Object clone(String field, SeaTunnelDataType<?> dataType, Object value) {
