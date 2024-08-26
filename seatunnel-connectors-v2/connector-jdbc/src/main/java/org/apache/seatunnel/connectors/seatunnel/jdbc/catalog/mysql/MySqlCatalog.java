@@ -18,6 +18,7 @@
 
 package org.apache.seatunnel.connectors.seatunnel.jdbc.catalog.mysql;
 
+import lombok.SneakyThrows;
 import org.apache.seatunnel.api.table.catalog.CatalogTable;
 import org.apache.seatunnel.api.table.catalog.Column;
 import org.apache.seatunnel.api.table.catalog.ConstraintKey;
@@ -36,14 +37,8 @@ import com.google.common.base.Preconditions;
 import com.mysql.cj.MysqlType;
 import lombok.extern.slf4j.Slf4j;
 
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
+import java.sql.*;
+import java.util.*;
 
 @Slf4j
 public class MySqlCatalog extends AbstractJdbcCatalog {
@@ -219,6 +214,27 @@ public class MySqlCatalog extends AbstractJdbcCatalog {
         return String.format(
                 "SELECT * FROM `%s`.`%s` LIMIT 1;",
                 tablePath.getDatabaseName(), tablePath.getTableName());
+    }
+
+    @SneakyThrows
+    public List<Map<String, Object>> querySql(String sql) {
+        try (PreparedStatement ps = getConnection(defaultUrl).prepareStatement(sql)) {
+            List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
+
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                ResultSetMetaData metaData = rs.getMetaData();
+                int columnCount = metaData.getColumnCount();
+                Map<String, Object> map = new HashMap<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    String columnName = metaData.getColumnName(i);
+                    Object columnValue = rs.getObject(i);
+                    map.put(columnName, columnValue);
+                }
+                result.add(map);
+            }
+            return result;
+        }
     }
 
     private MySqlVersion resolveVersion() {
