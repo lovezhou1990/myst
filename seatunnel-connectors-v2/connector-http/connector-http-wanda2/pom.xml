@@ -27,7 +27,7 @@
     </parent>
 
     <artifactId>connector-http-wanda2</artifactId>
-    <name>万达数据同步服务</name>
+    <name>万达数据同步服务2</name>
 
     <dependencies>
         <dependency>

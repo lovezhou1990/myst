@@ -19,6 +19,7 @@ package org.apache.seatunnel.connectors.seatunnel.wanda.source.http;
 
 import lombok.Getter;
 import net.minidev.json.JSONArray;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.seatunnel.api.serialization.DeserializationSchema;
 import org.apache.seatunnel.api.source.Boundedness;
@@ -44,6 +45,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.connectors.seatunnel.http.source.DeserializationCollector;
 import org.apache.seatunnel.shade.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -54,6 +56,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Setter
@@ -74,6 +78,7 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
     private boolean noMoreElementFlag = true;
     private Optional<PageInfo> pageInfoOptional = Optional.empty();
     private List<Map<String, Object>> dbsourceResult;
+    private Config pluginConfig;
     public WandaHttpSourceReader(
             HttpParameter httpParameter,
             SingleSplitReaderContext context,
@@ -93,7 +98,7 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
             DeserializationSchema<SeaTunnelRow> deserializationSchema,
             JsonField jsonField,
             String contentJson,
-            PageInfo pageInfo,List<Map<String, Object>> dbsourceResult) {
+            PageInfo pageInfo,List<Map<String, Object>> dbsourceResult,Config pluginConfig) {
         this.context = context;
         this.httpParameter = httpParameter;
         this.deserializationCollector = new DeserializationCollector(deserializationSchema);
@@ -101,11 +106,16 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
         this.contentJson = contentJson;
         this.pageInfoOptional = Optional.ofNullable(pageInfo);
         this.dbsourceResult = dbsourceResult;
+        this.pluginConfig = pluginConfig;
     }
 
     @Override
     public void open() {
         httpClient = new HttpClientProvider(httpParameter);
+        if (pluginConfig.hasPath("retry_witherr") && pluginConfig.getBoolean("retry_witherr")) {
+            httpClient.setRetryWithErrRequest(true);
+        }
+
     }
 
     @Override
@@ -150,10 +160,32 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
             throw new HttpConnectorException(HttpConnectorErrorCode.REQUEST_FAILED, msg);
         }
     }
+    public static String extractPlaceholder(String input) {
+        // 定义正则表达式
+        Pattern pattern = Pattern.compile("\\$\\{(.+?)\\}");
+
+        // 创建 matcher 对象
+        Matcher matcher = pattern.matcher(input);
+
+        // 检查是否匹配成功
+        if (matcher.find()) {
+            // 返回第一个匹配的结果
+            return matcher.group(1);
+        }
+
+        // 如果没有匹配到，返回空字符串
+        return "";
+    }
     public void pollAndCollectData(Collector<SeaTunnelRow> output,Map<String, Object> dataMap) throws Exception {
-        Map<String, String> queryPara = new HashMap<>();
-        queryPara.put("COMP_NO", dataMap.get("name").toString());
-        this.httpParameter.getParams().put("queryPara", JsonUtils.toJsonString(queryPara));
+        String queryParaParam = pluginConfig.getString("queryPara");
+        Map<String, String> queryParamMap = JsonUtils.toMap(queryParaParam);
+        for (String queryParamKey : queryParamMap.keySet()) {
+            String queryParamValueStr = queryParamMap.get(queryParamKey);
+            String variParamName = extractPlaceholder(queryParamValueStr);
+            String variParamValue = dataMap.get(variParamName).toString();
+            queryParamMap.put(queryParamKey, variParamValue);
+        }
+        this.httpParameter.getParams().put("queryPara", JsonUtils.toJsonString(queryParamMap));
         HttpResponse response =
                 httpClient.execute(
                         this.httpParameter.getUrl(),
@@ -238,12 +270,18 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
         if (contentJson != null) {
             bodyString = JsonUtils.stringToJsonNode(getPartOfJson(bodyString)).toString();
         }
+        if (StringUtils.isBlank(bodyString)) {
+            return;
+        }
         JsonNode data = JsonUtils.stringToJsonNode(bodyString);
         if (data.isArray()) {
             for (int i = 0; i < data.size(); i++) {
                 JsonNode jsonNode = data.get(i);
-                String s = jsonNode.textValue();
-                deserializationCollector.collect(s.getBytes(), output);
+                String s = jsonNode.toString();
+                if (StringUtils.isNotBlank(s)) {
+                    deserializationCollector.collect(s.getBytes(), output);
+                }
+
             }
         } else {
             deserializationCollector.collect(bodyString.getBytes(), output);

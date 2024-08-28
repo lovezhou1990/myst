@@ -92,5 +92,10 @@
             <artifactId>connector-http-wanda</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.seatunnel</groupId>
+            <artifactId>connector-http-wanda2</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 </project>

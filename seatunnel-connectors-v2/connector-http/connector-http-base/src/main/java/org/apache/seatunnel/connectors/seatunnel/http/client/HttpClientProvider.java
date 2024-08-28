@@ -49,6 +49,7 @@ import com.github.rholder.retry.RetryerBuilder;
 import com.github.rholder.retry.StopStrategies;
 import com.github.rholder.retry.WaitStrategies;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.connectors.seatunnel.http.exception.HttpConnectorException;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -61,6 +62,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 public class HttpClientProvider implements AutoCloseable {
@@ -70,6 +72,7 @@ public class HttpClientProvider implements AutoCloseable {
     private RequestConfig requestConfig;
     private final CloseableHttpClient httpClient;
     private final Retryer<CloseableHttpResponse> retryer;
+    private boolean retryWithErrRequest;
 
     public HttpClientProvider(HttpParameter httpParameter) {
         this.httpClient = HttpClients.createDefault();
@@ -79,6 +82,7 @@ public class HttpClientProvider implements AutoCloseable {
                         .setConnectTimeout(httpParameter.getConnectTimeoutMs())
                         .setSocketTimeout(httpParameter.getSocketTimeoutMs())
                         .build();
+        this.retryWithErrRequest = false;
     }
 
     private Retryer<CloseableHttpResponse> buildRetryer(HttpParameter httpParameter) {
@@ -98,9 +102,9 @@ public class HttpClientProvider implements AutoCloseable {
                             @Override
                             public <V> void onRetry(Attempt<V> attempt) {
                                 if (attempt.hasException()) {
-                                    log.warn(
+                                    log.error(
                                             String.format(
-                                                    "[%d] request http failed",
+                                                    "请求异常重试， 尝试次数:[%d] ",
                                                     attempt.getAttemptNumber()),
                                             attempt.getExceptionCause());
                                 }
@@ -356,14 +360,22 @@ public class HttpClientProvider implements AutoCloseable {
     private HttpResponse getResponse(HttpRequestBase request) throws Exception {
         // execute request
         try (CloseableHttpResponse httpResponse = retryWithException(request)) {
-            // get return result
-            if (httpResponse != null && httpResponse.getStatusLine() != null) {
-                String content = "";
-                if (httpResponse.getEntity() != null) {
-                    content = EntityUtils.toString(httpResponse.getEntity(), ENCODING);
+
+            if (isRetryWithErrRequest() && httpResponse.getStatusLine().getStatusCode() >= 200 && httpResponse.getStatusLine().getStatusCode() <= 207) {
+                // get return result
+                if (httpResponse != null && httpResponse.getStatusLine() != null) {
+                    String content = "";
+                    if (httpResponse.getEntity() != null) {
+                        content = EntityUtils.toString(httpResponse.getEntity(), ENCODING);
+                    }
+                    return new HttpResponse(httpResponse.getStatusLine().getStatusCode(), content);
                 }
-                return new HttpResponse(httpResponse.getStatusLine().getStatusCode(), content);
+            } else {
+                log.error("http请求发生请求重试：{}", request.toString());
+                return getResponse(request);
             }
+
+
         }
         return new HttpResponse(HttpStatus.SC_INTERNAL_SERVER_ERROR);
     }
@@ -430,5 +442,13 @@ public class HttpClientProvider implements AutoCloseable {
         if (Objects.nonNull(httpClient)) {
             httpClient.close();
         }
+    }
+
+    public boolean isRetryWithErrRequest() {
+        return retryWithErrRequest;
+    }
+
+    public void setRetryWithErrRequest(boolean retryWithErrRequest) {
+        this.retryWithErrRequest = retryWithErrRequest;
     }
 }

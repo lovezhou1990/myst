@@ -619,6 +619,7 @@ public class FieldNamedPreparedStatement implements PreparedStatement {
         return statement.isWrapperFor(iface);
     }
 
+    //zhoulj 重点：把预编译sql 翻译成了真实执行的SQL
     public static FieldNamedPreparedStatement prepareStatement(
             Connection connection, String sql, String[] fieldNames) throws SQLException {
         checkNotNull(connection, "connection must not be null.");

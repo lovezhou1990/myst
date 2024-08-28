@@ -25,8 +25,10 @@ import java.util.Map;
 public class WandaSource2 extends HttpSource {
     private final WandaSourceParameter2 wandaSourceParameter = new WandaSourceParameter2();
     List<Map<String, Object>> dbsourceResult;
+    private Config pluginConfig;
     protected WandaSource2(Config pluginConfig) {
         super(pluginConfig);
+        this.pluginConfig = pluginConfig;
         // 先构建查询参数；
         this.wandaSourceParameter.buildWithConfig(pluginConfig, null);
         Config dbsource = pluginConfig.getConfig("dbsource");
@@ -54,7 +56,7 @@ public class WandaSource2 extends HttpSource {
                 readerContext,
                 this.deserializationSchema,
                 jsonField,
-                contentField,this.pageInfo, this.dbsourceResult);
+                contentField,this.pageInfo, this.dbsourceResult,this.pluginConfig);
     }
 
     private String getParamsFormDb(Config pluginConfig) throws UnsupportedEncodingException {

@@ -48,6 +48,7 @@ public class BufferedBatchStatementExecutor implements JdbcBatchStatementExecuto
     public void executeBatch() throws SQLException {
         if (!buffer.isEmpty()) {
             for (SeaTunnelRow row : buffer) {
+                //zhoulj 关注怎么把数据翻译成sql 的；
                 statementExecutor.addToBatch(row);
             }
             statementExecutor.executeBatch();
