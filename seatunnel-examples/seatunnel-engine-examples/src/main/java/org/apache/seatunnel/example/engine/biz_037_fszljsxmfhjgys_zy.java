@@ -27,11 +27,11 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
 
-public class BIZ_037_FSZLXK_ZY {
+public class biz_037_fszljsxmfhjgys_zy {
 
     public static void main(String[] args)
             throws FileNotFoundException, URISyntaxException, CommandException {
-        String configurePath = args.length > 0 ? args[0] : "/examples/BIZ_037_FSZLXK_ZY.conf";
+        String configurePath = args.length > 0 ? args[0] : "/examples/biz_037_fszljsxmfhjgys_zy.conf";
         String configFile = getTestConfigFile(configurePath);
         ClientCommandArgs clientCommandArgs = new ClientCommandArgs();
         clientCommandArgs.setConfigFile(configFile);
@@ -47,7 +47,7 @@ public class BIZ_037_FSZLXK_ZY {
 
     public static String getTestConfigFile(String configFile)
             throws FileNotFoundException, URISyntaxException {
-        URL resource = BIZ_037_FSZLXK_ZY.class.getResource(configFile);
+        URL resource = biz_037_fszljsxmfhjgys_zy.class.getResource(configFile);
         if (resource == null) {
             throw new FileNotFoundException("Can't find config file: " + configFile);
         }

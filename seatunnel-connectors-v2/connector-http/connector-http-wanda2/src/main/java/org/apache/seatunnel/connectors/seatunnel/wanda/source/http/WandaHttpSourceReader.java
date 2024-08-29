@@ -17,10 +17,23 @@
 
 package org.apache.seatunnel.connectors.seatunnel.wanda.source.http;
 
+import com.github.rholder.retry.*;
+import com.google.common.base.Strings;
+import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
+import com.jayway.jsonpath.ReadContext;
 import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import net.minidev.json.JSONArray;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.seatunnel.api.serialization.DeserializationSchema;
 import org.apache.seatunnel.api.source.Boundedness;
 import org.apache.seatunnel.api.source.Collector;
@@ -35,29 +48,14 @@ import org.apache.seatunnel.connectors.seatunnel.http.config.JsonField;
 import org.apache.seatunnel.connectors.seatunnel.http.config.PageInfo;
 import org.apache.seatunnel.connectors.seatunnel.http.exception.HttpConnectorErrorCode;
 import org.apache.seatunnel.connectors.seatunnel.http.exception.HttpConnectorException;
-
-import com.google.common.base.Strings;
-import com.jayway.jsonpath.Configuration;
-import com.jayway.jsonpath.JsonPath;
-import com.jayway.jsonpath.Option;
-import com.jayway.jsonpath.ReadContext;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.connectors.seatunnel.http.source.DeserializationCollector;
-import org.apache.seatunnel.shade.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.seatunnel.shade.com.typesafe.config.Config;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Setter
@@ -79,18 +77,6 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
     private Optional<PageInfo> pageInfoOptional = Optional.empty();
     private List<Map<String, Object>> dbsourceResult;
     private Config pluginConfig;
-    public WandaHttpSourceReader(
-            HttpParameter httpParameter,
-            SingleSplitReaderContext context,
-            DeserializationSchema<SeaTunnelRow> deserializationSchema,
-            JsonField jsonField,
-            String contentJson) {
-        this.context = context;
-        this.httpParameter = httpParameter;
-        this.deserializationCollector = new DeserializationCollector(deserializationSchema);
-        this.jsonField = jsonField;
-        this.contentJson = contentJson;
-    }
 
     public WandaHttpSourceReader(
             HttpParameter httpParameter,
@@ -112,10 +98,34 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
     @Override
     public void open() {
         httpClient = new HttpClientProvider(httpParameter);
-        if (pluginConfig.hasPath("retry_witherr") && pluginConfig.getBoolean("retry_witherr")) {
-            httpClient.setRetryWithErrRequest(true);
-        }
-
+        Retryer retryer = RetryerBuilder.<CloseableHttpResponse>newBuilder()
+                .retryIfResult(r-> {
+                    return r.getStatusLine().getStatusCode() != HttpStatus.SC_OK;
+                })
+                .retryIfException(ex -> {
+                    return ExceptionUtils.indexOfType(ex, IOException.class) != -1;
+                })
+                .withStopStrategy(StopStrategies.stopAfterAttempt(httpParameter.getRetry()))
+                .withWaitStrategy(
+                        WaitStrategies.fibonacciWait(
+                                httpParameter.getRetryBackoffMultiplierMillis(),
+                                httpParameter.getRetryBackoffMaxMillis(),
+                                TimeUnit.MILLISECONDS))
+                .withRetryListener(
+                        new RetryListener() {
+                            @Override
+                            public <V> void onRetry(Attempt<V> attempt) {
+                                if (attempt.hasException()) {
+                                    log.error(
+                                            String.format(
+                                                    "请求异常重试， 尝试次数:[%d] ",
+                                                    attempt.getAttemptNumber()),
+                                            attempt.getExceptionCause());
+                                }
+                            }
+                        })
+                .build();
+        httpClient.setRetryer(retryer);
     }
 
     @Override
@@ -125,67 +135,31 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
         }
     }
 
-    public void pollAndCollectData(Collector<SeaTunnelRow> output) throws Exception {
-        HttpResponse response =
-                httpClient.execute(
-                        this.httpParameter.getUrl(),
-                        this.httpParameter.getMethod().getMethod(),
-                        this.httpParameter.getHeaders(),
-                        this.httpParameter.getParams(),
-                        this.httpParameter.getBody());
-        if (response.getCode() >= 200 && response.getCode() <= 207) {
-            String content = response.getContent();
-            if (!Strings.isNullOrEmpty(content)) {
-                if (this.httpParameter.isEnableMultilines()) {
-                    StringReader stringReader = new StringReader(content);
-                    BufferedReader bufferedReader = new BufferedReader(stringReader);
-                    String lineStr;
-                    while ((lineStr = bufferedReader.readLine()) != null) {
-                        collect(output, lineStr);
-                    }
-                } else {
-                    collect(output, content);
-                }
+    public static String fillExpression(String expression, Map<String, Object> valuesMap) {
+        if (MapUtils.isEmpty(valuesMap)) {
+            return expression;
+        }
+        for (Map.Entry<String, Object> entry : valuesMap.entrySet()) {
+            String key = "${" + entry.getKey() + "}";
+            if (entry.getValue() != null) {
+                String value = entry.getValue().toString();
+                expression = expression.replace(key, value);
             }
-            log.debug(
-                    "http client execute success request param:[{}], http response status code:[{}], content:[{}]",
-                    httpParameter.getParams(),
-                    response.getCode(),
-                    response.getContent());
-        } else {
-            String msg =
-                    String.format(
-                            "http client execute exception, http response status code:[%s], content:[%s]",
-                            response.getCode(), response.getContent());
-            throw new HttpConnectorException(HttpConnectorErrorCode.REQUEST_FAILED, msg);
+
         }
-    }
-    public static String extractPlaceholder(String input) {
-        // 定义正则表达式
-        Pattern pattern = Pattern.compile("\\$\\{(.+?)\\}");
-
-        // 创建 matcher 对象
-        Matcher matcher = pattern.matcher(input);
-
-        // 检查是否匹配成功
-        if (matcher.find()) {
-            // 返回第一个匹配的结果
-            return matcher.group(1);
-        }
-
-        // 如果没有匹配到，返回空字符串
-        return "";
+        return expression;
     }
     public void pollAndCollectData(Collector<SeaTunnelRow> output,Map<String, Object> dataMap) throws Exception {
-        String queryParaParam = pluginConfig.getString("queryPara");
-        Map<String, String> queryParamMap = JsonUtils.toMap(queryParaParam);
-        for (String queryParamKey : queryParamMap.keySet()) {
-            String queryParamValueStr = queryParamMap.get(queryParamKey);
-            String variParamName = extractPlaceholder(queryParamValueStr);
-            String variParamValue = dataMap.get(variParamName).toString();
-            queryParamMap.put(queryParamKey, variParamValue);
+        if (MapUtils.isNotEmpty(dataMap)) {
+            String queryParaParam = pluginConfig.getString("queryPara");
+            Map<String, String> queryParamMap = JsonUtils.toMap(queryParaParam);
+            for (String queryParamKey : queryParamMap.keySet()) {
+                String queryParamValueStr = queryParamMap.get(queryParamKey);
+                queryParamValueStr = fillExpression(queryParamValueStr,dataMap);
+                queryParamMap.put(queryParamKey, queryParamValueStr);
+            }
+            this.httpParameter.getParams().put("queryPara", JsonUtils.toJsonString(queryParamMap));
         }
-        this.httpParameter.getParams().put("queryPara", JsonUtils.toJsonString(queryParamMap));
         HttpResponse response =
                 httpClient.execute(
                         this.httpParameter.getUrl(),
@@ -234,23 +208,56 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
     public void internalPollNext(Collector<SeaTunnelRow> output) throws Exception {
         try {
             if (pageInfoOptional.isPresent()) {
-                noMoreElementFlag = false;
-                Long pageIndex = 1L;
-                while (!noMoreElementFlag) {
-                    log.error("开始加载第{}页的数据",pageIndex);
-                    PageInfo info = pageInfoOptional.get();
-                    // increment page
-                    info.setPageIndex(pageIndex);
-                    // set request param
-                    updateRequestParam(info);
-                    pollAndCollectData(output);
-                    pageIndex += 1;
-                    Thread.sleep(10);
+                if (CollectionUtils.isNotEmpty(this.getDbsourceResult())) {
+                    for (Map<String, Object> dataMap : this.getDbsourceResult()) {
+                        noMoreElementFlag = false;
+                        Long pageIndex = 1L;
+                        while (!noMoreElementFlag) {
+                            log.error("开始加载第{}页的数据", pageIndex);
+                            PageInfo info = pageInfoOptional.get();
+                            // increment page
+                            info.setPageIndex(pageIndex);
+                            // set request param
+                            updateRequestParam(info);
+                            pollAndCollectData(output, dataMap);
+                            pageIndex += 1;
+                            Thread.sleep(10);
+                        }
+                    }
+                } else {
+                    // 按逻辑俩说这里不会能为空，  为空的话 就是没有配置前置数据源
+                    boolean hasQueryDb = this.getPluginConfig().hasPath("queryParaDbsource");
+                    if (!hasQueryDb) {
+                        noMoreElementFlag = false;
+                        Long pageIndex = 1L;
+                        while (!noMoreElementFlag) {
+                            log.error("开始加载第{}页的数据", pageIndex);
+                            PageInfo info = pageInfoOptional.get();
+                            // increment page
+                            info.setPageIndex(pageIndex);
+                            // set request param
+                            updateRequestParam(info);
+                            pollAndCollectData(output, null);
+                            pageIndex += 1;
+                            Thread.sleep(10);
+                        }
+                    }
                 }
+
+
             } else {
-                for (Map<String, Object> dataMap : this.getDbsourceResult()) {
-                    pollAndCollectData(output, dataMap);
+                boolean hasQueryDb = this.getPluginConfig().hasPath("queryParaDbsource");
+                if (!hasQueryDb) {
+                    pollAndCollectData(output, null);
+                } else {
+                    if (CollectionUtils.isNotEmpty(this.getDbsourceResult())) {
+                        for (Map<String, Object> dataMap : this.getDbsourceResult()) {
+                            pollAndCollectData(output, dataMap);
+                        }
+                    }
                 }
+
+
 
             }
         } finally {
@@ -267,14 +274,35 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
     }
 
     private void collect(Collector<SeaTunnelRow> output, String bodyString) throws IOException {
+        if ( pageInfoOptional.isPresent()) {
+            String pageSum = JsonUtils.stringToJsonNode(getPageInfoOptional(bodyString)).toString();
+            if (NumberUtils.isDigits(pageSum)) {
+                pageInfoOptional.get().setTotalPageSize(Long.parseLong(pageSum));
+            }
+        }
         if (contentJson != null) {
             bodyString = JsonUtils.stringToJsonNode(getPartOfJson(bodyString)).toString();
         }
         if (StringUtils.isBlank(bodyString)) {
             return;
         }
-        JsonNode data = JsonUtils.stringToJsonNode(bodyString);
-        if (data.isArray()) {
+//        JsonNode data = JsonUtils.stringToJsonNode(bodyString);
+        // page increase
+        if (pageInfoOptional.isPresent()) {
+            // Determine whether the task is completed by specifying the presence of the 'total
+            // page' field
+            PageInfo pageInfo = pageInfoOptional.get();
+            if (pageInfo.getTotalPageSize() > 0) {
+                noMoreElementFlag = pageInfo.getPageIndex() >= pageInfo.getTotalPageSize();
+            } else {
+                // no 'total page' configured
+                int readSize = JsonUtils.stringToJsonNode(bodyString).size();
+                // if read size < BatchSize : read finish
+                // if read size = BatchSize : read next page.
+                noMoreElementFlag = readSize < pageInfo.getBatchSize();
+            }
+        }
+        /*if (data.isArray()) {
             for (int i = 0; i < data.size(); i++) {
                 JsonNode jsonNode = data.get(i);
                 String s = jsonNode.toString();
@@ -285,7 +313,8 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
             }
         } else {
             deserializationCollector.collect(bodyString.getBytes(), output);
-        }
+        }*/
+        deserializationCollector.collect(bodyString.getBytes(), output);
 
     }
 
@@ -307,30 +336,6 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
         return decodeDatas;
     }
 
-    private List<List<String>> decodeJSON(String data) {
-        ReadContext jsonReadContext = JsonPath.using(jsonConfiguration).parse(data);
-        List<List<String>> results = new ArrayList<>(jsonPaths.length);
-        for (JsonPath path : jsonPaths) {
-            List<String> result = jsonReadContext.read(path);
-            results.add(result);
-        }
-        for (int i = 1; i < results.size(); i++) {
-            List<?> result0 = results.get(0);
-            List<?> result = results.get(i);
-            if (result0.size() != result.size()) {
-                throw new HttpConnectorException(
-                        HttpConnectorErrorCode.FIELD_DATA_IS_INCONSISTENT,
-                        String.format(
-                                "[%s](%d) and [%s](%d) the number of parsing records is inconsistent.",
-                                jsonPaths[0].getPath(),
-                                result0.size(),
-                                jsonPaths[i].getPath(),
-                                result.size()));
-            }
-        }
-
-        return dataFlip(results);
-    }
 
     private String getPartOfJson(String data) {
         ReadContext jsonReadContext = JsonPath.using(jsonConfiguration).parse(data);
@@ -343,41 +348,11 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
                 JsonPath.compile(pageInfoOptional.get().getDynamPagesumField()));
         if (read!=null && read instanceof JSONArray) {
             JSONArray result = (JSONArray)read;
-            return result.get(0).toString();
+            if (result.size() > 0) {
+                return result.get(0).toString();
+            }
         }
         return "";
     }
 
-    private List<List<String>> dataFlip(List<List<String>> results) {
-
-        List<List<String>> datas = new ArrayList<>();
-        for (int i = 0; i < results.size(); i++) {
-            List<String> result = results.get(i);
-            if (i == 0) {
-                for (Object o : result) {
-                    String val = o == null ? null : o.toString();
-                    List<String> row = new ArrayList<>(jsonPaths.length);
-                    row.add(val);
-                    datas.add(row);
-                }
-            } else {
-                for (int j = 0; j < result.size(); j++) {
-                    Object o = result.get(j);
-                    String val = o == null ? null : o.toString();
-                    List<String> row = datas.get(j);
-                    row.add(val);
-                }
-            }
-        }
-        return datas;
-    }
-
-    private void initJsonPath(JsonField jsonField) {
-        jsonPaths = new JsonPath[jsonField.getFields().size()];
-        for (int index = 0; index < jsonField.getFields().keySet().size(); index++) {
-            jsonPaths[index] =
-                    JsonPath.compile(
-                            jsonField.getFields().values().toArray(new String[] {})[index]);
-        }
-    }
 }

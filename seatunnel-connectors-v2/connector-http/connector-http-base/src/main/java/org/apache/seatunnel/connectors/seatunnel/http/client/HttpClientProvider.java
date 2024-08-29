@@ -17,6 +17,9 @@
 
 package org.apache.seatunnel.connectors.seatunnel.http.client;
 
+import org.apache.http.HttpHost;
+import org.apache.http.conn.routing.HttpRoute;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.seatunnel.connectors.seatunnel.http.config.HttpParameter;
 
 import org.apache.commons.lang3.StringUtils;
@@ -71,18 +74,26 @@ public class HttpClientProvider implements AutoCloseable {
     private static final int INITIAL_CAPACITY = 16;
     private RequestConfig requestConfig;
     private final CloseableHttpClient httpClient;
-    private final Retryer<CloseableHttpResponse> retryer;
-    private boolean retryWithErrRequest;
+    private Retryer<CloseableHttpResponse> retryer;
 
     public HttpClientProvider(HttpParameter httpParameter) {
-        this.httpClient = HttpClients.createDefault();
+//        this.httpClient = HttpClients.createDefault();
         this.retryer = buildRetryer(httpParameter);
+
+        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();
+        // 设置总的最大连接数
+        cm.setMaxTotal(20);
+        cm.setDefaultMaxPerRoute(5);
+        this.httpClient = HttpClients.custom()
+                .setConnectionManager(cm).build();
         this.requestConfig =
                 RequestConfig.custom()
                         .setConnectTimeout(httpParameter.getConnectTimeoutMs())
                         .setSocketTimeout(httpParameter.getSocketTimeoutMs())
                         .build();
-        this.retryWithErrRequest = false;
+    }
+    public void setRetryer(Retryer<CloseableHttpResponse> retryer) {
+        this.retryer = retryer;
     }
 
     private Retryer<CloseableHttpResponse> buildRetryer(HttpParameter httpParameter) {
@@ -360,22 +371,14 @@ public class HttpClientProvider implements AutoCloseable {
     private HttpResponse getResponse(HttpRequestBase request) throws Exception {
         // execute request
         try (CloseableHttpResponse httpResponse = retryWithException(request)) {
-
-            if (isRetryWithErrRequest() && httpResponse.getStatusLine().getStatusCode() >= 200 && httpResponse.getStatusLine().getStatusCode() <= 207) {
-                // get return result
-                if (httpResponse != null && httpResponse.getStatusLine() != null) {
-                    String content = "";
-                    if (httpResponse.getEntity() != null) {
-                        content = EntityUtils.toString(httpResponse.getEntity(), ENCODING);
-                    }
-                    return new HttpResponse(httpResponse.getStatusLine().getStatusCode(), content);
+            // get return result
+            if (httpResponse != null && httpResponse.getStatusLine() != null) {
+                String content = "";
+                if (httpResponse.getEntity() != null) {
+                    content = EntityUtils.toString(httpResponse.getEntity(), ENCODING);
                 }
-            } else {
-                log.error("http请求发生请求重试：{}", request.toString());
-                return getResponse(request);
+                return new HttpResponse(httpResponse.getStatusLine().getStatusCode(), content);
             }
-
-
         }
         return new HttpResponse(HttpStatus.SC_INTERNAL_SERVER_ERROR);
     }
@@ -444,11 +447,4 @@ public class HttpClientProvider implements AutoCloseable {
         }
     }
 
-    public boolean isRetryWithErrRequest() {
-        return retryWithErrRequest;
-    }
-
-    public void setRetryWithErrRequest(boolean retryWithErrRequest) {
-        this.retryWithErrRequest = retryWithErrRequest;
-    }
 }

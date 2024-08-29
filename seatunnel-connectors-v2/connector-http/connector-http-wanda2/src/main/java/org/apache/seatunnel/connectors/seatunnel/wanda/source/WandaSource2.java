@@ -31,16 +31,19 @@ public class WandaSource2 extends HttpSource {
         this.pluginConfig = pluginConfig;
         // 先构建查询参数；
         this.wandaSourceParameter.buildWithConfig(pluginConfig, null);
-        Config dbsource = pluginConfig.getConfig("dbsource");
-        MySqlCatalog catalog =
-                new MySqlCatalog(
-                        "mysql",
-                        dbsource.getString("user"),
-                        dbsource.getString("password"),
-                        JdbcUrlUtil.getUrlInfo(dbsource.getString("url")));
-        catalog.open();
-        List<Map<String, Object>> maps = catalog.querySql(dbsource.getString("querySql"));
-        this.dbsourceResult = maps;
+        if (pluginConfig.hasPath("queryParaDbsource")) {
+            Config dbsource = pluginConfig.getConfig("queryParaDbsource");
+            MySqlCatalog catalog =
+                    new MySqlCatalog(
+                            "mysql",
+                            dbsource.getString("user"),
+                            dbsource.getString("password"),
+                            JdbcUrlUtil.getUrlInfo(dbsource.getString("url")));
+            catalog.open();
+            List<Map<String, Object>> maps = catalog.querySql(dbsource.getString("querySql"));
+            this.dbsourceResult = maps;
+        }
+
     }
 
     @Override

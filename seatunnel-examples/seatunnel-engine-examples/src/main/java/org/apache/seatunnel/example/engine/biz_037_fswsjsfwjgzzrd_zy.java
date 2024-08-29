@@ -31,7 +31,7 @@ public class biz_037_fswsjsfwjgzzrd_zy {
 
     public static void main(String[] args)
             throws FileNotFoundException, URISyntaxException, CommandException {
-        String configurePath = args.length > 0 ? args[0] : "/examples/BIZ_037_FSWSJSFWJGZZRD_ZY.conf";
+        String configurePath = args.length > 0 ? args[0] : "/examples/biz_037_fswsjsfwjgzzrd_zy.conf";
         String configFile = getTestConfigFile(configurePath);
         ClientCommandArgs clientCommandArgs = new ClientCommandArgs();
         clientCommandArgs.setConfigFile(configFile);
