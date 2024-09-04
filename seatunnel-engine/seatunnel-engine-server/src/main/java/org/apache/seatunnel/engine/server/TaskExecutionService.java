@@ -19,6 +19,8 @@ package org.apache.seatunnel.engine.server;
 
 import org.apache.seatunnel.api.common.metrics.MetricTags;
 import org.apache.seatunnel.api.event.Event;
+import org.apache.seatunnel.api.tracing.MDCExecutorService;
+import org.apache.seatunnel.api.tracing.MDCTracer;
 import org.apache.seatunnel.common.utils.ExceptionUtils;
 import org.apache.seatunnel.common.utils.RetryUtils;
 import org.apache.seatunnel.common.utils.StringFormatUtils;
@@ -283,6 +285,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
 
     private void submitBlockingTask(
             TaskGroupExecutionTracker taskGroupExecutionTracker, List<Task> tasks) {
+        MDCExecutorService mdcExecutorService = MDCTracer.tracing(executorService);
 
         CountDownLatch startedLatch = new CountDownLatch(tasks.size());
         //zhoulj 任务启动执行 2.8 任务提交到 executorService 中执行了，  后续操作就在  NamedTaskWrapper 的run 方法中了
@@ -300,7 +303,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
                                                 "BlockingWorker-"
                                                         + taskGroupExecutionTracker.taskGroup
                                                                 .getTaskGroupLocation()))
-                        .map(executorService::submit)
+                        .map(mdcExecutorService::submit)
                         .collect(toList());
 
         // Do not return from this method until all workers have started. Otherwise,
@@ -471,7 +474,7 @@ public class TaskExecutionService implements DynamicMetricsProvider {
                                             r.getTaskGroupLocation(), r.getExecutionState()));
                             notifyTaskStatusToMaster(taskGroup.getTaskGroupLocation(), r);
                         }),
-                executorService);
+                MDCTracer.tracing(executorService));
         return new PassiveCompletableFuture<>(resultFuture);
     }
 
@@ -543,7 +546,8 @@ public class TaskExecutionService implements DynamicMetricsProvider {
         if (!taskAsyncFunctionFuture.containsKey(taskGroupLocation)) {
             taskAsyncFunctionFuture.put(taskGroupLocation, new ConcurrentHashMap<>());
         }
-        CompletableFuture<?> future = CompletableFuture.runAsync(task, executorService);
+        CompletableFuture<?> future =
+                CompletableFuture.runAsync(task, MDCTracer.tracing(executorService));
         taskAsyncFunctionFuture.get(taskGroupLocation).put(id, future);
         future.whenComplete(
                 (r, e) -> {
@@ -985,10 +989,14 @@ public class TaskExecutionService implements DynamicMetricsProvider {
                 cancellationFutures.remove(taskGroupLocation);
                 try {
                     cancelAsyncFunction(taskGroupLocation);
-                } catch (Throwable e) {
-                    throw new RuntimeException(e);
+                } catch (Throwable t) {
+                    logger.severe("cancel async function failed", t);
                 }
-                updateMetricsContextInImap();
+                try {
+                    updateMetricsContextInImap();
+                } catch (Throwable t) {
+                    logger.severe("update metrics context in imap failed", t);
+                }
                 if (ex == null) {
                     logger.info(
                             String.format(

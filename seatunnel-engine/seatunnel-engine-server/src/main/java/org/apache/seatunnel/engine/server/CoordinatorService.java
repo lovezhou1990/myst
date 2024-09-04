@@ -21,6 +21,8 @@ import org.apache.seatunnel.api.common.metrics.JobMetrics;
 import org.apache.seatunnel.api.common.metrics.RawJobMetrics;
 import org.apache.seatunnel.api.event.EventHandler;
 import org.apache.seatunnel.api.event.EventProcessor;
+import org.apache.seatunnel.api.tracing.MDCExecutorService;
+import org.apache.seatunnel.api.tracing.MDCTracer;
 import org.apache.seatunnel.common.utils.ExceptionUtils;
 import org.apache.seatunnel.common.utils.SeaTunnelException;
 import org.apache.seatunnel.common.utils.StringFormatUtils;
@@ -316,7 +318,7 @@ public class CoordinatorService {
                                                                     "restore job (%s) from master active switch finished",
                                                                     entry.getKey()));
                                                 },
-                                                executorService))
+                                                MDCTracer.tracing(entry.getKey(), executorService)))
                         .collect(Collectors.toList());
 
         try {
@@ -468,11 +470,12 @@ public class CoordinatorService {
             return new PassiveCompletableFuture<>(jobSubmitFuture);
         }
 
+        MDCExecutorService mdcExecutorService = MDCTracer.tracing(jobId, executorService);
         JobMaster jobMaster =
                 new JobMaster(
                         jobImmutableInformation,
                         this.nodeEngine,
-                        executorService,
+                        mdcExecutorService,
                         getResourceManager(),
                         getJobHistoryService(),
                         runningJobStateIMap,
@@ -483,7 +486,7 @@ public class CoordinatorService {
                         engineConfig,
                         seaTunnelServer);
         //zhoulj 重点：通过任务配置文件生成执行计划 提交到线程池中开始初始化与执行任务
-        executorService.submit(
+        mdcExecutorService.submit(
                 () -> {
                     try {
                         if (!isStartWithSavePoint

@@ -25,17 +25,17 @@ import org.apache.seatunnel.engine.server.exception.TaskGroupContextNotFoundExce
 import org.apache.seatunnel.engine.server.execution.TaskLocation;
 import org.apache.seatunnel.engine.server.serializable.TaskDataSerializerHook;
 import org.apache.seatunnel.engine.server.task.SourceSeaTunnelTask;
+import org.apache.seatunnel.engine.server.task.operation.TracingOperation;
 
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
-import com.hazelcast.spi.impl.operationservice.Operation;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AssignSplitOperation<SplitT extends SourceSplit> extends Operation
+public class AssignSplitOperation<SplitT extends SourceSplit> extends TracingOperation
         implements IdentifiedDataSerializable {
 
     private List<byte[]> splits;
@@ -49,7 +49,7 @@ public class AssignSplitOperation<SplitT extends SourceSplit> extends Operation
     }
 
     @Override
-    public void run() throws Exception {
+    public void runInternal() throws Exception {
         //？？ 这里是接受分配器任务的吗？
         SeaTunnelServer server = getService();
         // 怎么接受分片请求的？
@@ -86,6 +86,7 @@ public class AssignSplitOperation<SplitT extends SourceSplit> extends Operation
 
     @Override
     protected void writeInternal(ObjectDataOutput out) throws IOException {
+        super.writeInternal(out);
         out.writeInt(splits.size());
         for (byte[] split : splits) {
             out.writeByteArray(split);
@@ -95,6 +96,7 @@ public class AssignSplitOperation<SplitT extends SourceSplit> extends Operation
 
     @Override
     protected void readInternal(ObjectDataInput in) throws IOException {
+        super.readInternal(in);
         int splitCount = in.readInt();
         splits = new ArrayList<>(splitCount);
         for (int i = 0; i < splitCount; i++) {
