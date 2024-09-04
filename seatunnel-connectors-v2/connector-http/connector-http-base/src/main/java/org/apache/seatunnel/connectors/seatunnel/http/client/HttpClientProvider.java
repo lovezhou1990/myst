@@ -82,8 +82,8 @@ public class HttpClientProvider implements AutoCloseable {
 
         PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();
         // 设置总的最大连接数
-        cm.setMaxTotal(20);
-        cm.setDefaultMaxPerRoute(5);
+        cm.setMaxTotal(200);
+        cm.setDefaultMaxPerRoute(50);
         this.httpClient = HttpClients.custom()
                 .setConnectionManager(cm).build();
         this.requestConfig =

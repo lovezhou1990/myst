@@ -38,6 +38,7 @@ import org.apache.seatunnel.api.serialization.DeserializationSchema;
 import org.apache.seatunnel.api.source.Boundedness;
 import org.apache.seatunnel.api.source.Collector;
 import org.apache.seatunnel.api.table.type.SeaTunnelRow;
+import org.apache.seatunnel.api.table.type.VarcharType;
 import org.apache.seatunnel.common.utils.JsonUtils;
 import org.apache.seatunnel.connectors.seatunnel.common.source.AbstractSingleSplitReader;
 import org.apache.seatunnel.connectors.seatunnel.common.source.SingleSplitReaderContext;
@@ -100,7 +101,16 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
         httpClient = new HttpClientProvider(httpParameter);
         Retryer retryer = RetryerBuilder.<CloseableHttpResponse>newBuilder()
                 .retryIfResult(r-> {
-                    return r.getStatusLine().getStatusCode() != HttpStatus.SC_OK;
+                    boolean valid = false;
+                    if (r.getStatusLine().getStatusCode() != HttpStatus.SC_OK) {
+                        valid = true;
+                        try {
+                            r.close();
+                        } catch (IOException e) {
+                            log.error("httpresponse 关闭异常 IOException， ",e);
+                        }
+                    }
+                    return valid;
                 })
                 .retryIfException(ex -> {
                     return ExceptionUtils.indexOfType(ex, IOException.class) != -1;
@@ -160,14 +170,23 @@ public class WandaHttpSourceReader extends AbstractSingleSplitReader<SeaTunnelRo
             }
             this.httpParameter.getParams().put("queryPara", JsonUtils.toJsonString(queryParamMap));
         }
-        HttpResponse response =
-                httpClient.execute(
-                        this.httpParameter.getUrl(),
-                        this.httpParameter.getMethod().getMethod(),
-                        this.httpParameter.getHeaders(),
-                        this.httpParameter.getParams(),
-                        this.httpParameter.getBody());
-        if (response.getCode() >= 200 && response.getCode() <= 207) {
+        HttpResponse response = null;
+        try {
+            response = httpClient.execute(
+                    this.httpParameter.getUrl(),
+                    this.httpParameter.getMethod().getMethod(),
+                    this.httpParameter.getHeaders(),
+                    this.httpParameter.getParams(),
+                    this.httpParameter.getBody());
+        }catch (RetryException retryException){
+            log.error("请求重试超限， 达到限制数：{}, 请求url:{}, 请求参数：{}",retryException.getNumberOfFailedAttempts()
+                    , httpParameter.getUrl(), JsonUtils.toJsonString(httpParameter.getParams()));
+            return;
+        }catch (Exception e) {
+            log.error("请求异常", e);
+            throw new RuntimeException(e);
+        }
+        if (response!=null && response.getCode() >= 200 && response.getCode() <= 207) {
             String content = response.getContent();
             if (!Strings.isNullOrEmpty(content)) {
                 if (this.httpParameter.isEnableMultilines()) {
