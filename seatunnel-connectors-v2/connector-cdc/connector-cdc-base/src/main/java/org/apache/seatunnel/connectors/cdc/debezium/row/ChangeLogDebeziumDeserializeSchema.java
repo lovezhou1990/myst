@@ -26,7 +26,6 @@ import org.apache.seatunnel.api.table.event.SchemaChangeEvent;
 import org.apache.seatunnel.api.table.event.handler.DataTypeChangeEventDispatcher;
 import org.apache.seatunnel.api.table.event.handler.DataTypeChangeEventHandler;
 import org.apache.seatunnel.api.table.type.*;
-import org.apache.seatunnel.connectors.cdc.base.option.ChangeLogMode;
 import org.apache.seatunnel.connectors.cdc.base.schema.SchemaChangeResolver;
 import org.apache.seatunnel.connectors.cdc.base.utils.SourceRecordUtils;
 import org.apache.seatunnel.connectors.cdc.debezium.DebeziumDeserializationConverterFactory;
@@ -219,8 +218,8 @@ public final class ChangeLogDebeziumDeserializeSchema
                 schemaName = schemaName.substring(0, schemaName.length()-6);
             }
 
-            Set<String> includeFields = this.getIncludeFields().get(schemaName);
-            Set<String> excludeFields = this.getExcludeFields().get(schemaName);
+            Set<String> includeFields = this.getIncludeFields()!=null?this.getIncludeFields().get(schemaName):null;
+            Set<String> excludeFields = this.getExcludeFields()!=null?this.getExcludeFields().get(schemaName):null;
             if (CollectionUtils.isNotEmpty(includeFields)) {
                 validFields = beforeSchema.fields().stream()
                         .filter(f -> includeFields.contains(f.name())).collect(Collectors.toSet());
